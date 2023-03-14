@@ -1,3 +1,5 @@
+#![allow(clippy::needless_return)]
+
 mod sha1;
 mod base32;
 pub mod totp;

@@ -20,12 +20,12 @@ pub fn from_moving_factor(secret: &[u8], moving_factor: u64, digits: usize) -> u
 
     let mac = sha1::hmac(secret, &moving_factor_bytes);
     let offset = (mac[19] & 0xf) as usize;
-    let number = (((mac[offset + 0] & 0x7F) as u32) << 24)
+    let number = (((mac[offset] & 0x7F) as u32) << 24)
         | (((mac[offset + 1] as u32) & 0xFF) << 16)
         | (((mac[offset + 2] as u32) & 0xFF) << 8)
         | ((mac[offset + 3] as u32) & 0xFF);
 
-    let digits = if digits < MOD_TABLE.len() { digits } else { MOD_TABLE.len() - 1 };
+    let digits = std::cmp::min(digits, MOD_TABLE.len() - 1);
     return number % MOD_TABLE[digits];
 }
 
