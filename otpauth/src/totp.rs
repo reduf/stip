@@ -25,7 +25,8 @@ pub fn from_moving_factor(secret: &[u8], moving_factor: u64, digits: usize) -> u
         | (((mac[offset + 2] as u32) & 0xFF) << 8)
         | ((mac[offset + 3] as u32) & 0xFF);
 
-    return number % MOD_TABLE[(digits % MOD_TABLE.len())];
+    let digits = if digits < MOD_TABLE.len() { digits } else { MOD_TABLE.len() - 1 };
+    return number % MOD_TABLE[digits];
 }
 
 pub fn from_seconds(secret: &[u8], timestamp: u64, digits: usize) -> u32 {
@@ -47,5 +48,11 @@ mod tests {
     fn works_with_specified_second() {
         let number = super::from_seconds(b"\x21\x22", 1678732967, 6);
         assert_eq!(number, 486091);
+    }
+
+    #[test]
+    fn support_very_large_digits() {
+        let number = super::from_seconds(b"\x21\x22", 1678732967, 32);
+        assert_eq!(number, 783486091);
     }
 }
