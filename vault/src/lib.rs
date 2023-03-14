@@ -62,3 +62,65 @@ pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
         unreachable!();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    const FILE_CONTENT: &[u8] = b"file content";
+
+    fn resource(suffix: &str) -> String {
+        let mut result = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        result.push("tests");
+        result.push("data");
+        result.push(suffix);
+        return result.into_os_string().into_string().unwrap();
+    }
+
+    #[test]
+    fn test_file_on_disk() {
+        assert_eq!(
+            super::open(&resource("file.txt"), None).unwrap().as_slice(),
+            FILE_CONTENT
+        );
+        assert_eq!(
+            super::open(&resource("subdir/file.txt"), None)
+                .unwrap()
+                .as_slice(),
+            FILE_CONTENT
+        );
+    }
+
+    #[test]
+    fn test_file_in_decrypted_zip() {
+        assert_eq!(
+            super::open(&resource("decrypted.zip/file.txt"), None)
+                .unwrap()
+                .as_slice(),
+            FILE_CONTENT
+        );
+        assert_eq!(
+            super::open(&resource("decrypted.zip/subdir/file.txt"), None)
+                .unwrap()
+                .as_slice(),
+            FILE_CONTENT
+        );
+    }
+
+    #[test]
+    fn test_file_in_encrypted_zip() {
+        let password = Some(b"password".as_ref());
+        assert_eq!(
+            super::open(&resource("decrypted.zip/file.txt"), password)
+                .unwrap()
+                .as_slice(),
+            FILE_CONTENT
+        );
+        assert_eq!(
+            super::open(&resource("decrypted.zip/subdir/file.txt"), password)
+                .unwrap()
+                .as_slice(),
+            FILE_CONTENT
+        );
+    }
+}
