@@ -1,9 +1,6 @@
 use clap::Parser;
 use image::{self, ImageFormat};
-use otpauth;
-use rqrr;
 use std::io::Cursor;
-use vault;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -20,14 +17,18 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let format = ImageFormat::from_path(args.input.as_str()).expect("Can't infer the image format");
+    let format = ImageFormat::from_path(args.input.as_str())
+        .expect("Can't infer the image format from the path");
 
     let password = args.password.as_deref().map(|inner| inner.as_bytes());
     let input_bytes = vault::open(&args.input, password).expect("Can't read input");
-    let img = image::load(Cursor::new(input_bytes), format).map_err(|_| {
-        println!("Couldn't read the file '{}'", args.input);
-        std::process::exit(1);
-    }).unwrap().to_luma8();
+    let img = image::load(Cursor::new(input_bytes), format)
+        .map_err(|_| {
+            println!("Couldn't read the file '{}'", args.input);
+            std::process::exit(1);
+        })
+        .unwrap()
+        .to_luma8();
     // Prepare for detection
     let mut img = rqrr::PreparedImage::prepare(img);
     // Search for grids, without decoding

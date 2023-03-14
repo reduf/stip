@@ -58,20 +58,12 @@ mod tests {
         (b"5FB2PALLET2NFGZ72LCVC6PE6VBDF6PC2ZGPP7DD", b"\xE9\x43\xA7\x81\x6B\x24\xF4\xD2\x9B\x3F\xD2\xC5\x51\x79\xE4\xF5\x42\x32\xF9\xE2\xD6\x4C\xF7\xFC\x63"),
     ];
 
-    static BAD_BASE32_TESTS: &[&[u8]] = &[
-        b"a0======",
-        b"a1======",
-        b"a/======",
-        b"0M=A====",
-    ];
+    static BAD_BASE32_TESTS: &[&[u8]] = &[b"a0======", b"a1======", b"a/======", b"0M=A===="];
 
     #[test]
     fn test_good_base32_strings() {
         for (input, expected) in GOOD_BASE32_TESTS {
-            assert_eq!(
-                super::b32decode(&input).unwrap().as_slice(),
-                *expected,
-            );
+            assert_eq!(super::b32decode(&input).unwrap().as_slice(), *expected,);
         }
     }
 

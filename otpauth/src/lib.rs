@@ -1,7 +1,7 @@
 #![allow(clippy::needless_return)]
 
-mod sha1;
 mod base32;
+mod sha1;
 pub mod totp;
 
 use url::{form_urlencoded, Host, Url};
@@ -93,7 +93,10 @@ mod tests {
 
     #[test]
     fn issuer_is_inferred_from_label() {
-        let res = ParsedUrl::parse("otpauth://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====").unwrap();
+        let res = ParsedUrl::parse(
+            "otpauth://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====",
+        )
+        .unwrap();
         assert_eq!(res.label.as_str(), "Company:example@company.com");
         assert_eq!(res.issuer.as_str(), "Company");
         assert_eq!(
@@ -104,13 +107,17 @@ mod tests {
 
     #[test]
     fn no_issuer_is_detected() {
-        ParsedUrl::parse("otpauth://totp/example%40company.com?secret=gkjeixzp5xmm37meoimq====").unwrap_err();
+        ParsedUrl::parse("otpauth://totp/example%40company.com?secret=gkjeixzp5xmm37meoimq====")
+            .unwrap_err();
     }
 
     #[test]
     fn invalid_scheme() {
         assert_eq!(
-            ParsedUrl::parse("http://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====").unwrap_err(),
+            ParsedUrl::parse(
+                "http://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq===="
+            )
+            .unwrap_err(),
             ParseError::InvalidScheme,
         );
     }
@@ -118,7 +125,10 @@ mod tests {
     #[test]
     fn invalid_domain() {
         assert_eq!(
-            ParsedUrl::parse("otpauth://example/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====").unwrap_err(),
+            ParsedUrl::parse(
+                "otpauth://example/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq===="
+            )
+            .unwrap_err(),
             ParseError::InvalidDomain,
         );
     }
