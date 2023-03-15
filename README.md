@@ -29,3 +29,10 @@ In order to decrypt file from a zip archive, simply add the zip archive as a dir
 > zip.exe tests/data/decrypted-noreply.example.zip/noreply.example.png
 > zip.exe tests/data/encrypted-with-password-noreply.example.zip/noreply.example.png -p password
 ```
+
+It may be desirable to not store your password in the command line argument, so you may prefer to use the flag `-p` or `--password` without an argument. When doing so, *stip* will prompt your for your password.
+
+```
+> stip.exe tests\data\encrypted-with-password-noreply.example.zip/noreply.example.png -p
+Enter password:
+```
