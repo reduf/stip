@@ -11,7 +11,7 @@ struct Args {
 
     /// Optional password if the file is stored in a encrypted zip.
     #[clap(short, long, value_name = "password")]
-    password: Option<String>,
+    password: Option<Option<String>>,
 }
 
 fn main() {
@@ -20,7 +20,18 @@ fn main() {
     let format = ImageFormat::from_path(args.input.as_str())
         .expect("Can't infer the image format from the path");
 
-    let password = args.password.as_deref().map(|inner| inner.as_bytes());
+    // First check if "-p" or "--password" was specified.
+    // When "-p" is specified, and there is still no value, simply prompt for it.
+    let password = args.password.map(|password| {
+        return password.unwrap_or_else(|| {
+            return rpassword::prompt_password(format!("Enter password: ",))
+                .expect("Failed to read user password");
+        });
+    });
+
+    // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
+    let password = password.as_deref().map(|inner| inner.as_bytes());
+
     let input_bytes = vault::open(&args.input, password).expect("Can't read input");
     let img = image::load(Cursor::new(input_bytes), format)
         .map_err(|_| {

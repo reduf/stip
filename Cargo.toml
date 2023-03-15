@@ -9,5 +9,6 @@ edition = "2021"
 clap = { version = "3.2", features = ["derive"] }
 image = "0.24.5"
 otpauth = { path = "otpauth" }
+rpassword = "7.2.0"
 rqrr = "0.6.0"
 vault = { path = "vault" }
