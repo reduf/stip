@@ -1,19 +1,32 @@
 #![allow(clippy::needless_return)]
 
 use std::fs::{self, File};
-use std::io::{ErrorKind, Read};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use zip::result::InvalidPassword;
 
 #[derive(Debug)]
 pub struct Error;
 
+fn can_continue(err: io::Error) -> Result<(), Error> {
+    #[cfg(windows)]
+    if err.kind() == io::ErrorKind::NotFound {
+        return Ok(());
+    }
+
+    #[cfg(unix)]
+    if err.raw_os_error() == Some(20) {
+        return Ok(());
+    }
+
+    return Err(Error);
+}
+
 pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
     let path = Path::new(path);
 
     match fs::read(path) {
-        Err(e) if e.kind() == ErrorKind::NotFound => (),
-        Err(_) => return Err(Error),
+        Err(err) => can_continue(err)?,
         Ok(bytes) => return Ok(bytes),
     };
 
@@ -22,8 +35,7 @@ pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
     let mut builder = PathBuf::from(path);
     while builder.pop() {
         match File::open(&builder) {
-            Err(e) if e.kind() == ErrorKind::NotFound => (),
-            Err(_) => return Err(Error),
+            Err(err) => can_continue(err)?,
             Ok(file) => {
                 reader = Some(file);
                 break;
