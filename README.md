@@ -21,18 +21,18 @@ The final executable can be found at `target/release/stip.exe`.
 Here is an example of how to print the TOTP code from an image:
 
 ```
-> zip.exe tests/data/noreply.example.png
+> stip.exe tests/data/noreply.example.png
 ```
 
 In order to decrypt file from a zip archive, simply add the zip archive as a directory in the path, for instance:
 ```
-> zip.exe tests/data/decrypted-noreply.example.zip/noreply.example.png
-> zip.exe tests/data/encrypted-with-password-noreply.example.zip/noreply.example.png -p password
+> stip.exe tests/data/decrypted-noreply.example.zip/noreply.example.png
+> stip.exe tests/data/encrypted-with-password-noreply.example.zip/noreply.example.png -p password
 ```
 
 It may be desirable to not store your password in the command line argument, so you may prefer to use the flag `-p` or `--password` without an argument. When doing so, *stip* will prompt your for your password.
 
 ```
-> stip.exe tests\data\encrypted-with-password-noreply.example.zip/noreply.example.png -p
+> stip.exe tests/data/encrypted-with-password-noreply.example.zip/noreply.example.png -p
 Enter password:
 ```
