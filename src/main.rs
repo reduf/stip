@@ -16,15 +16,24 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
+    match run(args) {
+        Err(message) => {
+            eprintln!("{}", message);
+            std::process::exit(1);
+        }
+        Ok(number) => println!("{:06}", number),
+    };
+}
 
+fn run(args: Args) -> Result<u32, String> {
     let format = ImageFormat::from_path(args.input.as_str())
-        .expect("Can't infer the image format from the path");
+        .map_err(|_| String::from("Can't infer the image format from the path."))?;
 
     // First check if "-p" or "--password" was specified.
     // When "-p" is specified, and there is still no value, simply prompt for it.
     let password = args.password.map(|password| {
         return password.unwrap_or_else(|| {
-            return rpassword::prompt_password(format!("Enter password: ",))
+            return rpassword::prompt_password("Enter password: ")
                 .expect("Failed to read user password");
         });
     });
@@ -32,23 +41,24 @@ fn main() {
     // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
     let password = password.as_deref().map(|inner| inner.as_bytes());
 
-    let input_bytes = vault::open(&args.input, password).expect("Can't read input");
-    let img = image::load(Cursor::new(input_bytes), format)
-        .map_err(|_| {
-            println!("Couldn't read the file '{}'", args.input);
-            std::process::exit(1);
-        })
-        .unwrap()
-        .to_luma8();
-    // Prepare for detection
-    let mut img = rqrr::PreparedImage::prepare(img);
-    // Search for grids, without decoding
-    let grids = img.detect_grids();
-    assert_eq!(grids.len(), 1);
-    // Decode the grid
-    let (_meta, content) = grids[0].decode().unwrap();
+    let input_bytes = vault::open(&args.input, password)
+        .map_err(|_| format!("Can't read input '{}'.", args.input))?;
 
-    let parsed = otpauth::ParsedUrl::parse(&content).unwrap();
-    let number = otpauth::totp::from_now(parsed.secret.as_slice(), 6);
-    println!("{:06}", number);
+    let img = image::load(Cursor::new(input_bytes), format)
+        .map_err(|_| format!("Couldn't read the image '{}'.", args.input))?
+        .to_luma8();
+
+    let mut img = rqrr::PreparedImage::prepare(img);
+    if let Some(grid) = img.detect_grids().first() {
+        let content = grid
+            .decode()
+            .map_err(|_| String::from("Failed to decode the QR code."))?
+            .1;
+        let parsed = otpauth::ParsedUrl::parse(&content)
+            .map_err(|_| String::from("Failed to parse URL found in QR code."))?;
+        let number = otpauth::totp::from_now(parsed.secret.as_slice(), 6);
+        return Ok(number);
+    } else {
+        return Err(String::from("Failed to detect the QR code."));
+    }
 }

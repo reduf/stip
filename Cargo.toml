@@ -2,8 +2,13 @@
 name = "stip"
 version = "0.1.0"
 edition = "2021"
+homepage = "https://github.com/reduf/stip.git"
+repository = "https://github.com/reduf/stip.git"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.release]
+panic = "abort"
 
 [dependencies]
 clap = { version = "3.2", features = ["derive"] }
