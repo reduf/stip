@@ -62,3 +62,27 @@ fn run(args: Args) -> Result<u32, String> {
         return Err(String::from("Failed to detect the QR code."));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn resource(suffix: &str) -> String {
+        let mut result = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        result.push("tests");
+        result.push("data");
+        result.push(suffix);
+        return result.into_os_string().into_string().unwrap();
+    }
+
+    fn args(input: &str) -> Args {
+        return Args::parse_from([String::from("stip.exe"), resource(input)]);
+    }
+
+    #[test]
+    fn load_different_image_formats() {
+        run(args("noreply.example.jpg")).unwrap();
+        run(args("noreply.example.png")).unwrap();
+        run(args("noreply.example.webp")).unwrap();
+    }
+}
