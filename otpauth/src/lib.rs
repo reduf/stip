@@ -6,6 +6,8 @@ pub mod totp;
 
 use url::{form_urlencoded, Host, Url};
 
+pub use totp::TotpToken;
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ParseError {
     InvalidUrl,

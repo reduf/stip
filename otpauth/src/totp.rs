@@ -1,5 +1,5 @@
 use crate::sha1;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const MOD_TABLE: [u32; 11] = [
     1,
@@ -14,6 +14,21 @@ const MOD_TABLE: [u32; 11] = [
     1000000000,
     u32::MAX,
 ];
+
+pub struct TotpToken {
+    pub number: u32,
+    created_at: SystemTime,
+    not_after: SystemTime,
+}
+
+impl TotpToken {
+    pub fn remaining_duration(&self) -> Duration {
+        return self
+            .not_after
+            .duration_since(self.created_at)
+            .expect("This should have worked");
+    }
+}
 
 pub fn from_moving_factor(secret: &[u8], moving_factor: u64, digits: usize) -> u32 {
     let moving_factor_bytes = moving_factor.to_be_bytes();
@@ -33,13 +48,24 @@ pub fn from_seconds(secret: &[u8], timestamp: u64, digits: usize) -> u32 {
     return from_moving_factor(secret, timestamp / 30, digits);
 }
 
-pub fn from_now(secret: &[u8], digits: usize) -> u32 {
-    let start = SystemTime::now();
-    let since_the_epoch = start
+pub fn from_now(secret: &[u8], digits: usize) -> TotpToken {
+    let created_at = SystemTime::now();
+    let seconds = created_at
         .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    let seconds_since_epoch = since_the_epoch.as_secs();
-    return from_seconds(secret, seconds_since_epoch, digits);
+        .expect("Time went backwards")
+        .as_secs();
+    let not_before = UNIX_EPOCH
+        .checked_add(Duration::new((seconds / 30) * 30, 0))
+        .expect("Couldn't create 'not_before'");
+    let not_after = not_before
+        .checked_add(Duration::new(30, 0))
+        .expect("Couldn't create 'not_after'");
+    let number = from_seconds(secret, seconds, digits);
+    return TotpToken {
+        number,
+        created_at,
+        not_after,
+    };
 }
 
 #[cfg(test)]

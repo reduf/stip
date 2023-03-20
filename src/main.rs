@@ -21,11 +21,13 @@ fn main() {
             eprintln!("{}", message);
             std::process::exit(1);
         }
-        Ok(number) => println!("{:06}", number),
+        Ok(token) => {
+            println!("{:06} - Valid for {:.0?}", token.number, token.remaining_duration());
+        }
     };
 }
 
-fn run(args: Args) -> Result<u32, String> {
+fn run(args: Args) -> Result<otpauth::TotpToken, String> {
     let format = ImageFormat::from_path(args.input.as_str())
         .map_err(|_| String::from("Can't infer the image format from the path."))?;
 
@@ -56,8 +58,8 @@ fn run(args: Args) -> Result<u32, String> {
             .1;
         let parsed = otpauth::ParsedUrl::parse(&content)
             .map_err(|_| String::from("Failed to parse URL found in QR code."))?;
-        let number = otpauth::totp::from_now(parsed.secret.as_slice(), 6);
-        return Ok(number);
+        let token = otpauth::totp::from_now(parsed.secret.as_slice(), 6);
+        return Ok(token);
     } else {
         return Err(String::from("Failed to detect the QR code."));
     }
