@@ -12,17 +12,26 @@ struct Args {
     /// Optional password if the file is stored in a encrypted zip.
     #[clap(short, long, value_name = "password")]
     password: Option<Option<String>>,
+
+    /// Print the output in a JSON serialized format.
+    #[clap(long)]
+    json: bool,
 }
 
 fn main() {
     let args = Args::parse();
+    let print_as_json = args.json;
     match run(args) {
         Err(message) => {
             eprintln!("{}", message);
             std::process::exit(1);
         }
         Ok(token) => {
-            println!("{:06} - Valid for {:.0?}", token.number, token.remaining_duration());
+            if print_as_json {
+                println!("{}", serde_json::to_string_pretty(&token).expect("Can't serialize the structure to JSON"));
+            } else {
+                println!("{:06} - Valid for {:.0?}", token.number, token.remaining_duration());
+            }
         }
     };
 }

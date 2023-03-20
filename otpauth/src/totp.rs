@@ -1,4 +1,5 @@
 use crate::sha1;
+use serde::Serialize;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const MOD_TABLE: [u32; 11] = [
@@ -15,6 +16,7 @@ const MOD_TABLE: [u32; 11] = [
     u32::MAX,
 ];
 
+#[derive(Serialize)]
 pub struct TotpToken {
     pub number: u32,
     created_at: SystemTime,
