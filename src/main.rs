@@ -13,6 +13,10 @@ struct Args {
     #[clap(short, long, value_name = "password")]
     password: Option<Option<String>>,
 
+    /// When in interactive mode, stip will list available files from the zip file.
+    #[clap(short, long)]
+    interactive: bool,
+
     /// Print the output in a JSON serialized format.
     #[clap(long)]
     json: bool,
@@ -20,6 +24,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
+
     let print_as_json = args.json;
     match run(args) {
         Err(message) => {
@@ -37,9 +42,6 @@ fn main() {
 }
 
 fn run(args: Args) -> Result<otpauth::TotpToken, String> {
-    let format = ImageFormat::from_path(args.input.as_str())
-        .map_err(|_| String::from("Can't infer the image format from the path."))?;
-
     // First check if "-p" or "--password" was specified.
     // When "-p" is specified, and there is still no value, simply prompt for it.
     let password = args.password.map(|password| {
@@ -52,8 +54,19 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
     // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
     let password = password.as_deref().map(|inner| inner.as_bytes());
 
-    let input_bytes = vault::open(&args.input, password)
-        .map_err(|_| format!("Can't read input '{}'.", args.input))?;
+    let (input_bytes, format) = if args.interactive {
+        let (input_bytes, file_name) = vault::interactive(&args.input, password)
+            .map_err(|_| String::from("Couldn't select and read an image interactively."))?;
+        let format = ImageFormat::from_path(file_name.as_str())
+            .map_err(|_| String::from("Can't infer the image format from the path."))?;
+        (input_bytes, format)
+    } else {
+        let format = ImageFormat::from_path(args.input.as_str())
+            .map_err(|_| String::from("Can't infer the image format from the path."))?;
+        let input_bytes = vault::open(&args.input, password)
+            .map_err(|_| format!("Can't read input '{}'.", args.input))?;
+        (input_bytes, format)
+    };
 
     let img = image::load(Cursor::new(input_bytes), format)
         .map_err(|_| format!("Couldn't read the image '{}'.", args.input))?
