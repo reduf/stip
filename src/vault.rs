@@ -150,7 +150,7 @@ mod tests {
     fn resource(suffix: &str) -> String {
         let mut result = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         result.push("tests");
-        result.push("data");
+        result.push("vault");
         result.push(suffix);
         return result.into_os_string().into_string().unwrap();
     }

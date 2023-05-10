@@ -1,12 +1,9 @@
 #![allow(clippy::needless_return)]
 
-mod base32;
-mod sha1;
-pub mod totp;
-
+use crate::base32;
 use url::{form_urlencoded, Host, Url};
 
-pub use totp::TotpToken;
+pub use crate::totp::TotpToken;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ParseError {

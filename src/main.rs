@@ -2,6 +2,12 @@ use clap::Parser;
 use image::{self, ImageFormat};
 use std::io::Cursor;
 
+mod base32;
+mod otpauth;
+mod sha1;
+mod totp;
+mod vault;
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -80,7 +86,7 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
             .1;
         let parsed = otpauth::ParsedUrl::parse(&content)
             .map_err(|_| String::from("Failed to parse URL found in QR code."))?;
-        let token = otpauth::totp::from_now(parsed.secret.as_slice(), 6);
+        let token = totp::from_now(parsed.secret.as_slice(), 6);
         return Ok(token);
     } else {
         return Err(String::from("Failed to detect the QR code."));

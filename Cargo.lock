@@ -818,16 +818,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ceedf44fb00f2d1984b0bc98102627ce622e083e49a5bacdb3e514fa4238e267"
 
 [[package]]
-name = "otpauth"
-version = "0.1.0"
-dependencies = [
- "serde",
- "sha1_smol",
- "url",
- "urlencoding",
-]
-
-[[package]]
 name = "password-hash"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1181,11 +1171,15 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "image",
- "otpauth",
+ "promptly",
  "rpassword",
  "rqrr",
+ "serde",
  "serde_json",
- "vault",
+ "sha1_smol",
+ "url",
+ "urlencoding",
+ "zip",
 ]
 
 [[package]]
@@ -1366,14 +1360,6 @@ name = "utf8parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
-
-[[package]]
-name = "vault"
-version = "0.1.0"
-dependencies = [
- "promptly",
- "zip",
-]
 
 [[package]]
 name = "version_check"
