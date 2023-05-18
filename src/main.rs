@@ -1,10 +1,9 @@
 use clap::Parser;
-use image::{self, ImageFormat};
-use std::io::Cursor;
 
 mod base32;
 mod otpauth;
 mod sha1;
+mod stb_image;
 mod totp;
 mod vault;
 
@@ -57,27 +56,25 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
         });
     });
 
-    let (input_bytes, format) = if args.interactive {
-        let (input_bytes, file_name) = vault::interactive(&args.input, password)
+    let input_bytes = if args.interactive {
+        let input_bytes = vault::interactive(&args.input, password)
             .map_err(|_| String::from("Couldn't select and read an image interactively."))?;
-        let format = ImageFormat::from_path(file_name.as_str())
-            .map_err(|_| String::from("Can't infer the image format from the path."))?;
-        (input_bytes, format)
+        input_bytes
     } else {
-        let format = ImageFormat::from_path(args.input.as_str())
-            .map_err(|_| String::from("Can't infer the image format from the path."))?;
         // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
         let password = password.as_deref().map(|inner| inner.as_bytes());
         let input_bytes = vault::open(&args.input, password)
             .map_err(|_| format!("Can't read input '{}'.", args.input))?;
-        (input_bytes, format)
+        input_bytes
     };
 
-    let img = image::load(Cursor::new(input_bytes), format)
-        .map_err(|_| format!("Couldn't read the image '{}'.", args.input))?
-        .to_luma8();
+    let img = stb_image::load_bytes(input_bytes.as_slice())
+        .map_err(|_| format!("Couldn't read the image '{}'.", args.input))?;
 
-    let mut img = rqrr::PreparedImage::prepare(img);
+    let mut img = rqrr::PreparedImage::prepare_from_greyscale(img.width, img.height, |x, y| {
+        return img.data()[(y * img.width) + x];
+    });
+
     if let Some(grid) = img.detect_grids().first() {
         let content = grid
             .decode()

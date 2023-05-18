@@ -69,7 +69,7 @@ struct VaultFile {
     encrypted: bool,
 }
 
-pub fn interactive(path: &str, password: Option<String>) -> Result<(Vec<u8>, String), Error> {
+pub fn interactive(path: &str, password: Option<String>) -> Result<Vec<u8>, Error> {
     let path = Path::new(path);
     let reader = File::open(&path).map_err(|_| Error)?;
 
@@ -120,7 +120,7 @@ pub fn interactive(path: &str, password: Option<String>) -> Result<(Vec<u8>, Str
     };
 
     let bytes = result_from_zip_file(result, &names[idx].file_name)?;
-    return Ok((bytes, std::mem::take(&mut names[idx]).file_name));
+    return Ok(bytes);
 }
 
 pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
