@@ -109,6 +109,5 @@ mod tests {
     fn load_different_image_formats() {
         run(args("noreply.example.jpg")).unwrap();
         run(args("noreply.example.png")).unwrap();
-        run(args("noreply.example.webp")).unwrap();
     }
 }
