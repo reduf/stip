@@ -57,9 +57,6 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
         });
     });
 
-    // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
-    let password = password.as_deref().map(|inner| inner.as_bytes());
-
     let (input_bytes, format) = if args.interactive {
         let (input_bytes, file_name) = vault::interactive(&args.input, password)
             .map_err(|_| String::from("Couldn't select and read an image interactively."))?;
@@ -69,6 +66,8 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
     } else {
         let format = ImageFormat::from_path(args.input.as_str())
             .map_err(|_| String::from("Can't infer the image format from the path."))?;
+        // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
+        let password = password.as_deref().map(|inner| inner.as_bytes());
         let input_bytes = vault::open(&args.input, password)
             .map_err(|_| format!("Can't read input '{}'.", args.input))?;
         (input_bytes, format)

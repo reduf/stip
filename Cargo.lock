@@ -1532,9 +1532,8 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 
 [[package]]
 name = "zip"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0445d0fbc924bb93539b4316c11afb121ea39296f99a3c4c9edad09e3658cdef"
+version = "0.6.5"
+source = "git+https://github.com/reduf/zip?branch=feature/add-encrypted-get-function#b8bed607e35dd5842fa8329ce483ac065fe47add"
 dependencies = [
  "aes",
  "byteorder",

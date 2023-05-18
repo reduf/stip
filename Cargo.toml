@@ -21,4 +21,4 @@ serde_json = "1.0"
 sha1_smol = "1.0.0"
 url = "2.3.1"
 urlencoding = "2.1.2"
-zip = "0.6.4"
+zip = { git = "https://github.com/reduf/zip", branch = "feature/add-encrypted-get-function" }

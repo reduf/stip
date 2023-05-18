@@ -62,7 +62,14 @@ fn result_from_zip_file(
     };
 }
 
-pub fn interactive(path: &str, password: Option<&[u8]>) -> Result<(Vec<u8>, String), Error> {
+#[derive(Default)]
+struct VaultFile {
+    file_name: String,
+    file_number: usize,
+    encrypted: bool,
+}
+
+pub fn interactive(path: &str, password: Option<String>) -> Result<(Vec<u8>, String), Error> {
     let path = Path::new(path);
     let reader = File::open(&path).map_err(|_| Error)?;
 
@@ -70,7 +77,12 @@ pub fn interactive(path: &str, password: Option<&[u8]>) -> Result<(Vec<u8>, Stri
     let mut names = Vec::new();
     for file_number in 0..zip.len() {
         if let Ok(file) = zip.by_index_raw(file_number) {
-            names.push((file.name().to_string(), file_number));
+            let encrypted = file.encrypted();
+            names.push(VaultFile {
+                file_name: file.name().to_string(),
+                file_number,
+                encrypted: encrypted,
+            });
         } else {
             println!("Failed to read file #{}", file_number);
         }
@@ -81,8 +93,9 @@ pub fn interactive(path: &str, password: Option<&[u8]>) -> Result<(Vec<u8>, Stri
         return Err(Error);
     }
 
-    for (idx, (file_name, _)) in names.iter().enumerate() {
-        println!("{}: {}", idx + 1, file_name);
+    for (idx, entry) in names.iter().enumerate() {
+        let encrypted_letter = if entry.encrypted { 'E' } else { ' ' };
+        println!("{}: [{}] {}", idx + 1, encrypted_letter, entry.file_name);
     }
 
     let idx = if 1 < names.len() {
@@ -91,15 +104,23 @@ pub fn interactive(path: &str, password: Option<&[u8]>) -> Result<(Vec<u8>, Stri
         0
     };
 
-    let file_number = names[idx].1;
-    let result = if let Some(password) = password {
+    let file_number = names[idx].file_number;
+    let result = if names[idx].encrypted {
+        let password = if let Some(password) = password {
+            password
+        } else {
+            rpassword::prompt_password("Enter password: ")
+                .expect("Failed to read user password")
+        };
+
+        let password = password.as_bytes();
         zip.by_index_decrypt(file_number, password)
     } else {
         zip.by_index(file_number).map(Ok)
     };
 
-    let bytes = result_from_zip_file(result, &names[idx].0)?;
-    return Ok((bytes, std::mem::take(&mut names[idx]).0));
+    let bytes = result_from_zip_file(result, &names[idx].file_name)?;
+    return Ok((bytes, std::mem::take(&mut names[idx]).file_name));
 }
 
 pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
