@@ -6,6 +6,8 @@ mod sha1;
 mod stb_image;
 mod totp;
 mod vault;
+mod app;
+mod password;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -30,23 +32,39 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let print_as_json = args.json;
-    match run(args) {
-        Err(message) => {
-            eprintln!("{}", message);
-            std::process::exit(1);
-        }
-        Ok(token) => {
-            if print_as_json {
-                println!("{}", serde_json::to_string_pretty(&token).expect("Can't serialize the structure to JSON"));
-            } else {
-                println!("{:06} - Valid for {:.0?}", token.number, token.remaining_duration());
+    if args.json {
+        match run(args) {
+            Err(message) => {
+                eprintln!("{}", message);
+                std::process::exit(1);
             }
+            Ok(token) => {
+                println!("{}", serde_json::to_string_pretty(&token).expect("Can't serialize the structure to JSON"));
+            }
+        };
+    } else {
+        // First check if "-p" or "--password" was specified.
+        // When "-p" is specified, and there is still no value, simply prompt for it.
+        let password = args.password.map(|password| {
+            return password.unwrap_or_else(|| {
+                return rpassword::prompt_password("Enter password: ")
+                    .expect("Failed to read user password");
+            });
+        });
+
+        if let Ok(authenticodes) = vault::list(args.input.as_str(), password.as_deref()) {
+            if app::build(authenticodes).is_err() {
+                eprintln!("Failed to open input '{:?}'", args.input);
+            }
+        } else {
+            eprintln!("Failed to list the vault '{}'", args.input.as_str());
         }
-    };
+    }
 }
 
 fn run(args: Args) -> Result<otpauth::TotpToken, String> {
+    let input = args.input.as_str();
+
     // First check if "-p" or "--password" was specified.
     // When "-p" is specified, and there is still no value, simply prompt for it.
     let password = args.password.map(|password| {
@@ -57,19 +75,19 @@ fn run(args: Args) -> Result<otpauth::TotpToken, String> {
     });
 
     let input_bytes = if args.interactive {
-        let input_bytes = vault::interactive(&args.input, password)
+        let input_bytes = vault::interactive(input, password.as_deref())
             .map_err(|_| String::from("Couldn't select and read an image interactively."))?;
         input_bytes
     } else {
         // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
         let password = password.as_deref().map(|inner| inner.as_bytes());
-        let input_bytes = vault::open(&args.input, password)
-            .map_err(|_| format!("Can't read input '{}'.", args.input))?;
+        let input_bytes = vault::open(input, password)
+            .map_err(|_| format!("Can't read input '{}'.", input))?;
         input_bytes
     };
 
     let img = stb_image::load_bytes(input_bytes.as_slice())
-        .map_err(|_| format!("Couldn't read the image '{}'.", args.input))?;
+        .map_err(|_| format!("Couldn't read the image '{}'.", input))?;
 
     let mut img = rqrr::PreparedImage::prepare_from_greyscale(img.width, img.height, |x, y| {
         return img.data()[(y * img.width) + x];

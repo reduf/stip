@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use zip::result::{InvalidPassword, ZipResult};
 use zip::read::ZipFile;
 
+use crate::{otpauth, stb_image};
+
 #[derive(Debug)]
 pub struct Error;
 
@@ -41,17 +43,17 @@ fn prompt_in_range(label: &str, min: usize, max: usize) -> Result<usize, Error> 
     return Err(Error);
 }
 
-fn result_from_zip_file(
+pub fn result_from_zip_file(
     result: ZipResult<Result<ZipFile<'_>, InvalidPassword>>,
-    file_name: &str,
+    filename: &str,
 ) -> Result<Vec<u8>, Error> {
     match result {
         Err(e) => {
-            println!("Error reading file '{}', error: {}", file_name, e);
+            println!("Error reading file '{}', error: {}", filename, e);
             return Err(Error);
         }
         Ok(Err(InvalidPassword)) => {
-            println!("Invaid password when reading '{}'", file_name);
+            println!("Invaid password when reading '{}'", filename);
             return Err(Error);
         }
         Ok(Ok(mut file)) => {
@@ -64,12 +66,12 @@ fn result_from_zip_file(
 
 #[derive(Default)]
 struct VaultFile {
-    file_name: String,
+    filename: String,
     file_number: usize,
     encrypted: bool,
 }
 
-pub fn interactive(path: &str, password: Option<String>) -> Result<Vec<u8>, Error> {
+pub fn interactive(path: &str, password: Option<&str>) -> Result<Vec<u8>, Error> {
     let path = Path::new(path);
     let reader = File::open(&path).map_err(|_| Error)?;
 
@@ -79,7 +81,7 @@ pub fn interactive(path: &str, password: Option<String>) -> Result<Vec<u8>, Erro
         if let Ok(file) = zip.by_index_raw(file_number) {
             let encrypted = file.encrypted();
             names.push(VaultFile {
-                file_name: file.name().to_string(),
+                filename: file.name().to_string(),
                 file_number,
                 encrypted: encrypted,
             });
@@ -95,7 +97,7 @@ pub fn interactive(path: &str, password: Option<String>) -> Result<Vec<u8>, Erro
 
     for (idx, entry) in names.iter().enumerate() {
         let encrypted_letter = if entry.encrypted { 'E' } else { ' ' };
-        println!("{}: [{}] {}", idx + 1, encrypted_letter, entry.file_name);
+        println!("{}: [{}] {}", idx + 1, encrypted_letter, entry.filename);
     }
 
     let idx = if 1 < names.len() {
@@ -106,20 +108,18 @@ pub fn interactive(path: &str, password: Option<String>) -> Result<Vec<u8>, Erro
 
     let file_number = names[idx].file_number;
     let result = if names[idx].encrypted {
-        let password = if let Some(password) = password {
-            password
+        if let Some(password) = password {
+            zip.by_index_decrypt(file_number, password.as_bytes())
         } else {
-            rpassword::prompt_password("Enter password: ")
-                .expect("Failed to read user password")
-        };
-
-        let password = password.as_bytes();
-        zip.by_index_decrypt(file_number, password)
+            let password = rpassword::prompt_password("Enter password: ")
+                .expect("Failed to read user password");
+            zip.by_index_decrypt(file_number, password.as_bytes())
+        }
     } else {
         zip.by_index(file_number).map(Ok)
     };
 
-    let bytes = result_from_zip_file(result, &names[idx].file_name)?;
+    let bytes = result_from_zip_file(result, &names[idx].filename)?;
     return Ok(bytes);
 }
 
@@ -160,6 +160,96 @@ pub fn open(path: &str, password: Option<&[u8]>) -> Result<Vec<u8>, Error> {
     } else {
         unreachable!();
     }
+}
+
+pub struct VaultSecret {
+    pub filename: String,
+    pub secret: Option<Box<[u8]>>,
+    encrypted: bool,
+}
+
+fn read_secret(output: &mut VaultSecret, image_bytes: &[u8]) -> Result<(), Error> {
+    let img = stb_image::load_bytes(image_bytes).map_err(|err| {
+        eprintln!("Couldn't read the image '{}', error: {}", output.filename, err);
+        return Error;
+    })?;
+
+    let mut img = rqrr::PreparedImage::prepare_from_greyscale(img.width, img.height, |x, y| {
+        return img.data()[(y * img.width) + x];
+    });
+
+    if let Some(grid) = img.detect_grids().first() {
+        let content = grid
+            .decode()
+            .map_err(|err| {
+                eprintln!("Failed to decode the QR code of '{}', error: {}", output.filename, err);
+                return Error;
+            })?
+            .1;
+
+        let parsed = otpauth::ParsedUrl::parse(&content).map_err(|err| {
+            eprintln!("Failed to parse URL found in QR code of '{}', error: {:?}", output.filename, err);
+            return Error;
+        })?;
+
+        output.secret = Some(parsed.secret.into_boxed_slice());
+        return Ok(());
+    } else {
+        eprintln!("Failed to detect the QR code of '{}'", output.filename);
+        return Err(Error);
+    }
+}
+
+pub fn list(path: &str, password: Option<&str>) -> Result<Vec<VaultSecret>, Error> {
+    let path = Path::new(path);
+    let reader = File::open(&path).map_err(|_| Error)?;
+
+    let mut zip = zip::ZipArchive::new(reader).unwrap();
+    let mut results = Vec::new();
+    for file_number in 0..zip.len() {
+        let mut new_secret = if let Ok(file) = zip.by_index_raw(file_number) {
+            let encrypted = file.encrypted();
+            VaultSecret {
+                filename: file.name().to_string(),
+                secret: None,
+                encrypted,
+            }
+        } else {
+            eprintln!("Failed to read file #{}", file_number);
+            continue;
+        };
+
+        let result = if new_secret.encrypted {
+            if let Some(password) = password {
+                zip.by_index_decrypt(file_number, password.as_bytes())
+            } else {
+                Ok(Err(InvalidPassword))
+            }
+        } else {
+            zip.by_index(file_number).map(Ok)
+        };
+
+        match result {
+            Err(err) => {
+                eprintln!("Error reading file '{}', error: {}", new_secret.filename, err);
+                continue;
+            }
+            Ok(Err(InvalidPassword)) => {
+                eprintln!("Invaid password when reading '{}'", new_secret.filename);
+                results.push(new_secret);
+                continue;
+            }
+            Ok(Ok(mut file)) => {
+                let mut buffer = Vec::with_capacity(file.size() as usize);
+                file.read_to_end(&mut buffer).map_err(|_| Error)?;
+                if read_secret(&mut new_secret, buffer.as_slice()).is_ok() {
+                    results.push(new_secret);
+                }
+            }
+        }
+    }
+
+    return Ok(results);
 }
 
 #[cfg(test)]

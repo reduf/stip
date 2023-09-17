@@ -70,6 +70,18 @@ pub fn from_now(secret: &[u8], digits: usize) -> TotpToken {
     };
 }
 
+pub fn progress() -> f32 {
+    let window = 30u128 * 1000;
+    let created_at = SystemTime::now();
+    let seconds = created_at
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
+    let min = (seconds / window) * window;
+    let offset = seconds - min;
+    return (offset as f32) / 30000.0;
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
