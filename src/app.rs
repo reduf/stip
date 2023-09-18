@@ -4,6 +4,7 @@ use crate::{password, totp, vault};
 struct App {
     copy_icon: egui_extras::RetainedImage,
     lock_icon: egui_extras::RetainedImage,
+    plus_icon: egui_extras::RetainedImage,
     password_modal_open: bool,
     password_text: String,
     secrets: Vec<vault::VaultSecret>,
@@ -35,22 +36,38 @@ impl App {
             include_str!("../assets/key.svg"),
         ).unwrap();
 
+        let plus_icon = egui_extras::RetainedImage::from_svg_str(
+            "Plus",
+            include_str!("../assets/plus.svg"),
+        ).unwrap();
+
         return Self {
             copy_icon,
             lock_icon,
+            plus_icon,
             password_modal_open: false,
             password_text: String::new(),
             secrets,
         };
     }
 
-    fn show_menu(ui: &mut egui::Ui) {
+    fn show_menu(&self, ctx: &egui::Context, ui: &mut egui::Ui) {
         use egui::{menu, Button};
 
         menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Open").clicked() {
                     // …
+                }
+            });
+
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                let button = egui::Button::image_and_text(
+                    self.plus_icon.texture_id(ctx),
+                    egui::vec2(24.0, 24.0),
+                    "Add",
+                );
+                if ui.add(button).clicked() {
                 }
             });
         });
@@ -118,18 +135,18 @@ impl eframe::App for App {
                             self.password_modal_open = false;
                         }
                     });
-
                     if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                         self.password_text.clear();
                         self.password_modal_open = false;
                     }
                 });
+
             self.password_modal_open &= password_modal_open;
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_enabled_ui(!self.password_modal_open, |ui| {
-                Self::show_menu(ui);
+                self.show_menu(ctx, ui);
                 ui.separator();
                 // We call `request_repaint` otherwise the progress bar glitch, presumably, because
                 // it doesn't know it has to repaint every frame?
