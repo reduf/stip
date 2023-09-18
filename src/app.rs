@@ -156,11 +156,13 @@ impl eframe::App for App {
 
                 ui.set_visible(true);
 
-                egui::Grid::new("my_grid")
-                    .num_columns(1)
-                    .spacing([40.0, 4.0])
-                    .striped(true)
-                    .show(ui, |ui| self.draw_grid_content(ctx, ui));
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    egui::Grid::new("my_grid")
+                        .num_columns(1)
+                        .spacing([40.0, 4.0])
+                        .striped(true)
+                        .show(ui, |ui| self.draw_grid_content(ctx, ui));
+                });
             });
         });
     }
