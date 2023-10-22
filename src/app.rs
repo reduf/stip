@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::{password, totp, vault};
 use std::path::PathBuf;
+use rfd::FileDialog;
 
 struct App {
     copy_icon: egui_extras::RetainedImage,
@@ -9,7 +10,7 @@ struct App {
 
     password_modal: Option<PasswordWindow>,
     secrets: Vec<vault::VaultSecret>,
-    database: vault::Vault,
+    database: Option<vault::Vault>,
 }
 
 struct PasswordWindow {
@@ -73,7 +74,7 @@ impl PasswordWindow {
     }
 }
 
-pub fn build(input: &str) -> Result<(), eframe::Error> {
+pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(320.0, 480.0)),
         ..Default::default()
@@ -88,7 +89,7 @@ pub fn build(input: &str) -> Result<(), eframe::Error> {
 }
 
 impl App {
-    fn new(input: &str) -> App {
+    fn new(input: Option<&str>) -> App {
         let copy_icon = egui_extras::RetainedImage::from_svg_str(
             "Copy",
             include_str!("../assets/copy.svg"),
@@ -104,7 +105,7 @@ impl App {
             include_str!("../assets/plus.svg"),
         ).unwrap();
 
-        let database = vault::Vault::open(PathBuf::from(input)).unwrap();
+        let database = input.map(|path| vault::Vault::open(PathBuf::from(path)).ok()).flatten();
 
         return Self {
             copy_icon,
@@ -116,13 +117,21 @@ impl App {
         };
     }
 
-    fn show_menu(&self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn pick_database() -> Option<PathBuf> {
+        let file_dialog = FileDialog::new();
+        return file_dialog.pick_file();
+    }
+
+    fn show_menu(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         use egui::menu;
 
         menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Open").clicked() {
-                    // …
+                    if let Some(path) = Self::pick_database() {
+                        self.secrets.clear();
+                        self.database = vault::Vault::open(path).ok();
+                    }
                 }
             });
 
@@ -175,19 +184,23 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.secrets.is_empty() && self.password_modal.is_none() {
-            if self.database.requires_password() {
-                self.password_modal = Some(PasswordWindow::open());
-            } else {
-                self.secrets = self.database.list(None).unwrap();
+            if let Some(database) = self.database.as_ref() {
+                if database.requires_password() {
+                    self.password_modal = Some(PasswordWindow::open());
+                } else {
+                    self.secrets = database.list(None).unwrap();
+                }
             }
         }
 
         if let Some(mut window) = self.password_modal.take() {
             if let Some(password) = window.show(ctx) {
-                if let Ok(authenticodes) = self.database.list(Some(password.as_ref())) {
-                    self.secrets = authenticodes;
-                } else {
-                    self.password_modal = Some(window);
+                if let Some(database) = self.database.as_ref() {
+                    if let Ok(authenticodes) = database.list(Some(password.as_ref())) {
+                        self.secrets = authenticodes;
+                    } else {
+                        self.password_modal = Some(window);
+                    }
                 }
             } else {
                 self.password_modal = Some(window);

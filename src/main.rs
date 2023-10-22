@@ -14,7 +14,7 @@ mod password;
 struct Args {
     /// Path on disk if the file to be signed.
     #[clap(value_name = "file", index = 1)]
-    input: String,
+    input: Option<String>,
 
     /// Optional password if the file is stored in a encrypted zip.
     #[clap(short, long, value_name = "password")]
@@ -37,7 +37,7 @@ fn main() {
         });
     });
 
-    if app::build(args.input.as_str()).is_err() {
+    if app::build(args.input.as_deref()).is_err() {
         eprintln!("Failed to open input '{:?}'", args.input);
     }
 }
