@@ -23,15 +23,6 @@ pub struct TotpToken {
     not_after: SystemTime,
 }
 
-impl TotpToken {
-    pub fn remaining_duration(&self) -> Duration {
-        return self
-            .not_after
-            .duration_since(self.created_at)
-            .expect("This should have worked");
-    }
-}
-
 pub fn from_moving_factor(secret: &[u8], moving_factor: u64, digits: usize) -> u32 {
     let moving_factor_bytes = moving_factor.to_be_bytes();
 

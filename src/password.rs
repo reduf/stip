@@ -49,4 +49,3 @@ pub fn password_ui(ui: &mut egui::Ui, password: &mut String) -> egui::Response {
 pub fn password(password: &mut String) -> impl egui::Widget + '_ {
     return move |ui: &mut egui::Ui| password_ui(ui, password);
 }
-

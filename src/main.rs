@@ -23,109 +23,21 @@ struct Args {
     /// When in interactive mode, stip will list available files from the zip file.
     #[clap(short, long)]
     interactive: bool,
-
-    /// Print the output in a JSON serialized format.
-    #[clap(long)]
-    json: bool,
 }
 
 fn main() {
     let args = Args::parse();
 
-    if args.json {
-        match run(args) {
-            Err(message) => {
-                eprintln!("{}", message);
-                std::process::exit(1);
-            }
-            Ok(token) => {
-                println!("{}", serde_json::to_string_pretty(&token).expect("Can't serialize the structure to JSON"));
-            }
-        };
-    } else {
-        // First check if "-p" or "--password" was specified.
-        // When "-p" is specified, and there is still no value, simply prompt for it.
-        let password = args.password.map(|password| {
-            return password.unwrap_or_else(|| {
-                return rpassword::prompt_password("Enter password: ")
-                    .expect("Failed to read user password");
-            });
-        });
-
-        if let Ok(authenticodes) = vault::list(args.input.as_str(), password.as_deref()) {
-            if app::build(authenticodes).is_err() {
-                eprintln!("Failed to open input '{:?}'", args.input);
-            }
-        } else {
-            eprintln!("Failed to list the vault '{}'", args.input.as_str());
-        }
-    }
-}
-
-fn run(args: Args) -> Result<otpauth::TotpToken, String> {
-    let input = args.input.as_str();
-
     // First check if "-p" or "--password" was specified.
     // When "-p" is specified, and there is still no value, simply prompt for it.
-    let password = args.password.map(|password| {
+    let _ = args.password.map(|password| {
         return password.unwrap_or_else(|| {
             return rpassword::prompt_password("Enter password: ")
                 .expect("Failed to read user password");
         });
     });
 
-    let input_bytes = if args.interactive {
-        let input_bytes = vault::interactive(input, password.as_deref())
-            .map_err(|_| String::from("Couldn't select and read an image interactively."))?;
-        input_bytes
-    } else {
-        // Convert `Option<String>` to `Option<&str>` to `Option<&[u8]>`.
-        let password = password.as_deref().map(|inner| inner.as_bytes());
-        let input_bytes = vault::open(input, password)
-            .map_err(|_| format!("Can't read input '{}'.", input))?;
-        input_bytes
-    };
-
-    let img = stb_image::load_bytes(input_bytes.as_slice())
-        .map_err(|_| format!("Couldn't read the image '{}'.", input))?;
-
-    let mut img = rqrr::PreparedImage::prepare_from_greyscale(img.width, img.height, |x, y| {
-        return img.data()[(y * img.width) + x];
-    });
-
-    if let Some(grid) = img.detect_grids().first() {
-        let content = grid
-            .decode()
-            .map_err(|_| String::from("Failed to decode the QR code."))?
-            .1;
-        let parsed = otpauth::ParsedUrl::parse(&content)
-            .map_err(|_| String::from("Failed to parse URL found in QR code."))?;
-        let token = totp::from_now(parsed.secret.as_slice(), 6);
-        return Ok(token);
-    } else {
-        return Err(String::from("Failed to detect the QR code."));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn resource(suffix: &str) -> String {
-        let mut result = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        result.push("tests");
-        result.push("data");
-        result.push(suffix);
-        return result.into_os_string().into_string().unwrap();
-    }
-
-    fn args(input: &str) -> Args {
-        return Args::parse_from([String::from("stip.exe"), resource(input)]);
-    }
-
-    #[test]
-    fn load_different_image_formats() {
-        run(args("noreply.example.jpg")).unwrap();
-        run(args("noreply.example.png")).unwrap();
+    if app::build(args.input.as_str()).is_err() {
+        eprintln!("Failed to open input '{:?}'", args.input);
     }
 }
