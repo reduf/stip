@@ -4,10 +4,6 @@ use std::path::PathBuf;
 use rfd::FileDialog;
 
 struct App {
-    copy_icon: egui_extras::RetainedImage,
-    lock_icon: egui_extras::RetainedImage,
-    plus_icon: egui_extras::RetainedImage,
-
     password_modal: Option<PasswordWindow>,
     secrets: Vec<vault::VaultSecret>,
     database: Option<vault::Vault>,
@@ -76,7 +72,7 @@ impl PasswordWindow {
 
 pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(320.0, 480.0)),
+        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 480.0]),
         ..Default::default()
     };
 
@@ -84,33 +80,17 @@ pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
     return eframe::run_native(
         "Stip",
         options,
-        Box::new(|_| app),
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            return app;
+        }),
     );
 }
 
 impl App {
     fn new(input: Option<&str>) -> App {
-        let copy_icon = egui_extras::RetainedImage::from_svg_str(
-            "Copy",
-            include_str!("../assets/copy.svg"),
-        ).unwrap();
-
-        let lock_icon = egui_extras::RetainedImage::from_svg_str(
-            "Lock",
-            include_str!("../assets/key.svg"),
-        ).unwrap();
-
-        let plus_icon = egui_extras::RetainedImage::from_svg_str(
-            "Plus",
-            include_str!("../assets/plus.svg"),
-        ).unwrap();
-
         let database = input.map(|path| vault::Vault::open(PathBuf::from(path)).ok()).flatten();
-
         return Self {
-            copy_icon,
-            lock_icon,
-            plus_icon,
             password_modal: None,
             secrets: Vec::new(),
             database,
@@ -136,11 +116,8 @@ impl App {
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                let button = egui::Button::image_and_text(
-                    self.plus_icon.texture_id(ctx),
-                    egui::vec2(24.0, 24.0),
-                    "Add",
-                );
+                let img = egui::Image::new(egui::include_image!("../assets/plus.svg"));
+                let button = egui::Button::image_and_text(img, "Add");
 
                 if ui.add(button).clicked() {
                 }
@@ -151,10 +128,8 @@ impl App {
     fn draw_grid_content(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         for row in &self.secrets {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let button = egui::ImageButton::new(
-                    self.copy_icon.texture_id(ctx),
-                    egui::vec2(24.0, 24.0)
-                );
+                let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
+                let button = egui::ImageButton::new(img);
 
                 let request_copy_into_clipboard = ui.add(button).clicked();
 
@@ -166,7 +141,8 @@ impl App {
                     }
                     ui.label(&token_text);
                 } else {
-                    let button = egui::ImageButton::new(self.lock_icon.texture_id(ctx), egui::vec2(24.0, 24.0));
+                    let img = egui::Image::new(egui::include_image!("../assets/key.svg"));
+                    let button = egui::ImageButton::new(img);
                     if ui.add(button).clicked() {
                         // self.password_modal_open = true;
                     }
