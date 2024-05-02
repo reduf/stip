@@ -39,7 +39,7 @@ impl PasswordWindow {
 
     pub fn show(&mut self, ctx: &egui::Context) -> Option<String> {
         let mut is_open = true;
-        let mut close_after = true;
+        let mut close_after = false;
         egui::Window::new("Password input")
             .open(&mut is_open)
             .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -54,7 +54,7 @@ impl PasswordWindow {
                 }
 
                 if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    close_after = false;
+                    close_after = true;
                 }
 
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -62,22 +62,23 @@ impl PasswordWindow {
                     size.x /= 2.0;
 
                     if ui.add_sized(size, egui::Button::new("Enter")).clicked() {
+                        close_after = true;
                     }
 
                     if ui.add_sized(ui.available_size(), egui::Button::new("Cancel")).clicked() {
                         self.password.clear();
-                        close_after = false;
+                        close_after = true;
                     }
                 });
                 if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                     self.password.clear();
-                    close_after = false;
+                    close_after = true;
                 }
 
                 self.first_use = false;
             });
 
-        if !(close_after && is_open) {
+        if close_after || !is_open {
             return Some(self.password.clone());
         } else {
             return None;
@@ -183,8 +184,9 @@ impl App {
                         .vertical_align(egui::Align::Center)
                         .horizontal_align(egui::Align::Center);
                     if ui.add_sized(ui.available_size(), text_edit).lost_focus() {
+                        row.editing = false;
+
                         if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                            row.editing = false;
                         }
                     }
                 } else {
