@@ -1,7 +1,7 @@
 #![allow(clippy::needless_return)]
 
 use std::io::{Cursor, Read};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use zip::result::InvalidPassword;
 
 use crate::{otpauth, stb_image};
@@ -15,8 +15,31 @@ pub struct Vault {
 
 pub struct VaultSecret {
     pub filename: String,
+    pub name: String,
     pub secret: Option<Box<[u8]>>,
     encrypted: bool,
+}
+
+impl VaultSecret {
+    pub fn from_path(path: &Path) -> Result<Self, Error> {
+        let content = std::fs::read(path).map_err(|err| {
+            eprintln!("Failed to open {:?}, err: {}", path, err);
+            return Error;
+        })?;
+
+        let mut new_secret = VaultSecret {
+            filename: path.to_str().ok_or_else(|| {
+                eprintln!("Failed to convert path {:?} to utf8 string", path);
+                return Error;
+            })?.to_string(),
+            name: String::from(""),
+            secret: None,
+            encrypted: false,
+        };
+
+        read_secret(&mut new_secret, content.as_slice())?;
+        return Ok(new_secret);
+    }
 }
 
 impl Vault {
@@ -52,6 +75,7 @@ impl Vault {
                 let encrypted = file.encrypted();
                 VaultSecret {
                     filename: file.name().to_string(),
+                    name: String::from(""),
                     secret: None,
                     encrypted,
                 }
@@ -117,6 +141,7 @@ fn read_secret(output: &mut VaultSecret, image_bytes: &[u8]) -> Result<(), Error
         })?;
 
         output.secret = Some(parsed.secret.into_boxed_slice());
+        output.name = format!("{}: {}", parsed.issuer, parsed.account_name);
         return Ok(());
     } else {
         eprintln!("Failed to detect the QR code of '{}'", output.filename);

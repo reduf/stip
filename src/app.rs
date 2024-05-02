@@ -6,6 +6,7 @@ use rfd::FileDialog;
 struct App {
     password_modal: Option<PasswordWindow>,
     secrets: Vec<vault::VaultSecret>,
+    dropped_files: Vec<egui::DroppedFile>,
     database: Option<vault::Vault>,
 }
 
@@ -72,7 +73,9 @@ impl PasswordWindow {
 
 pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 480.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([320.0, 480.0])
+            .with_drag_and_drop(true),
         ..Default::default()
     };
 
@@ -93,6 +96,7 @@ impl App {
         return Self {
             password_modal: None,
             secrets: Vec::new(),
+            dropped_files: Vec::new(),
             database,
         };
     }
@@ -102,7 +106,7 @@ impl App {
         return file_dialog.pick_file();
     }
 
-    fn show_menu(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn show_menu(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         use egui::menu;
 
         menu::bar(ui, |ui| {
@@ -125,7 +129,7 @@ impl App {
         });
     }
 
-    fn draw_grid_content(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn draw_grid_content(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         for row in &self.secrets {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
@@ -148,8 +152,7 @@ impl App {
                     }
                 }
 
-                let filename = row.filename.clone();
-                ui.add_sized(ui.available_size(), egui::Label::new(&filename));
+                ui.add_sized(ui.available_size(), egui::Label::new(&row.name));
             });
 
             ui.end_row();
@@ -205,5 +208,22 @@ impl eframe::App for App {
                 });
             });
         });
+
+        ctx.input(|input| {
+            if !input.raw.dropped_files.is_empty() {
+                self.dropped_files = input.raw.dropped_files.clone();
+            }
+        });
+
+        for file in self.dropped_files.iter() {
+            if let Some(path) = file.path.as_deref() {
+                match vault::VaultSecret::from_path(path) {
+                    Ok(secret) => self.secrets.push(secret),
+                    Err(err) => eprintln!("Failed to load {:?} as secret, err: {:?}", path, err),
+                }
+            }
+        }
+
+        self.dropped_files.clear();
     }
 }

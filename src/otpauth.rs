@@ -3,8 +3,6 @@
 use crate::base32;
 use url::{form_urlencoded, Host, Url};
 
-pub use crate::totp::TotpToken;
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ParseError {
     InvalidUrl,
@@ -16,7 +14,7 @@ pub enum ParseError {
 
 #[derive(Debug, Clone)]
 pub struct ParsedUrl {
-    pub label: String,
+    pub account_name: String,
     pub issuer: String,
     pub secret: Vec<u8>,
 }
@@ -41,7 +39,14 @@ impl ParsedUrl {
             })?
             .into_owned();
 
-        let mut issuer = None;
+        // The issuer can be specified in the label with the pattern "{issuer}:{name}".
+        // If this is the case and the label query parameter is present, we ensure they
+        // are equal.
+        let (mut issuer, account_name) = match label.split_once(':') {
+            None => (None, label),
+            Some((issuer, account_name)) => (Some(issuer.to_string()), account_name.to_string())
+        };
+
         let mut secret = None;
 
         let query = res.query().ok_or(ParseError::IncompleteQuery)?;
@@ -51,24 +56,22 @@ impl ParsedUrl {
                     return ParseError::IncompleteQuery;
                 })?);
             } else if key == "issuer" {
-                issuer = Some(val.into_owned());
+                if let Some(issuer) = issuer.as_deref() {
+                    if val != issuer {
+                        return Err(ParseError::InvalidUrl);
+                    }
+                } else {
+                    issuer = Some(val.into_owned());
+                }
             }
         }
 
-        // The issuer sometimes need to be inferred from the label, namely, it follows
-        // the pattern "{issuer}:{name}"
         if issuer.is_none() {
-            issuer = Some(
-                label
-                    .split_once(':')
-                    .ok_or(ParseError::NoIssuer)?
-                    .0
-                    .to_string(),
-            );
+            return Err(ParseError::NoIssuer);
         }
 
         return Ok(ParsedUrl {
-            label,
+            account_name,
             issuer: issuer.ok_or(ParseError::IncompleteQuery)?,
             secret: secret.ok_or(ParseError::IncompleteQuery)?,
         });
