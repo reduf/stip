@@ -25,16 +25,24 @@ struct App {
 }
 
 struct PasswordWindow {
-    first_use: bool,
+    select: bool,
+    failure: bool,
     password: String,
 }
 
 impl PasswordWindow {
     pub fn open() -> Self {
         return Self {
-            first_use: true,
+            select: true,
+            failure: false,
             password: String::new(),
         };
+    }
+
+    pub fn failed(mut self) -> Self {
+        self.select = true;
+        self.failure = true;
+        return self;
     }
 
     pub fn show(&mut self, ctx: &egui::Context) -> Option<String> {
@@ -47,9 +55,9 @@ impl PasswordWindow {
             .resizable(false)
             .fixed_size(egui::vec2(240.0, 15.0))
             .show(ctx, |ui| {
-                let response = ui.add(password::password(&mut self.password));
+                let response = ui.add(password::password(&mut self.password, self.failure));
 
-                if self.first_use {
+                if self.select {
                     ui.memory_mut(|mem| mem.request_focus(response.id));
                 }
 
@@ -70,12 +78,13 @@ impl PasswordWindow {
                         close_after = true;
                     }
                 });
+
                 if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
                     self.password.clear();
                     close_after = true;
                 }
 
-                self.first_use = false;
+                self.select = false;
             });
 
         if close_after || !is_open {
@@ -213,7 +222,7 @@ impl eframe::App for App {
                     if let Ok(authenticodes) = database.list(Some(password.as_ref())) {
                         self.rows = authenticodes.into_iter().map(Row::new).collect::<Vec<Row>>();
                     } else {
-                        self.password_modal = Some(window);
+                        self.password_modal = Some(window.failed());
                     }
                 }
             } else {

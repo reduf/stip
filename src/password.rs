@@ -1,4 +1,4 @@
-pub fn password_ui(ui: &mut egui::Ui, password: &mut String) -> egui::Response {
+pub fn password_ui(ui: &mut egui::Ui, password: &mut String, enable_error_border: bool) -> egui::Response {
     // This widget has its own state - show or hide password characters (`show_plaintext`).
     // In this case we use a simple `bool`, but you can also declare your own type.
     // It must implement at least `Clone` and be `'static`.
@@ -24,6 +24,11 @@ pub fn password_ui(ui: &mut egui::Ui, password: &mut String) -> egui::Response {
             show_plaintext = !show_plaintext;
         }
 
+        if enable_error_border {
+            ui.style_mut().visuals.selection.stroke.width = 1.5;
+            ui.style_mut().visuals.selection.stroke.color = egui::Color32::LIGHT_RED;
+        }
+
         // Show the password field:
         return ui.add_sized(
             ui.available_size(),
@@ -46,6 +51,6 @@ pub fn password_ui(ui: &mut egui::Ui, password: &mut String) -> egui::Response {
 /// ``` ignore
 /// ui.add(password(&mut my_password));
 /// ```
-pub fn password(password: &mut String) -> impl egui::Widget + '_ {
-    return move |ui: &mut egui::Ui| password_ui(ui, password);
+pub fn password(password: &mut String, enable_error_border: bool) -> impl egui::Widget + '_ {
+    return move |ui: &mut egui::Ui| password_ui(ui, password, enable_error_border);
 }
