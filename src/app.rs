@@ -150,7 +150,7 @@ impl App {
                 let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
                 let button = egui::ImageButton::new(img);
 
-                let request_copy_into_clipboard = ui.add(button).clicked();
+                let request_copy_into_clipboard = ui.add_sized([24.0, 24.0], button).clicked();
 
                 if let Some(secret) = row.secret.as_deref() {
                     let token = totp::from_now(secret, 6);
