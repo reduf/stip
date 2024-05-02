@@ -60,13 +60,7 @@ impl ParsedUrl {
                     return ParseError::IncompleteQuery;
                 })?);
             } else if key == "issuer" {
-                if let Some(issuer) = issuer.as_deref() {
-                    if val != issuer {
-                        return Err(ParseError::InvalidUrl);
-                    }
-                } else {
-                    issuer = Some(val.into_owned());
-                }
+                issuer = Some(val.into_owned());
             } else if key == "digits" {
                 digits = usize::from_str_radix(&val, 10).map_err(|err| {
                     eprintln!("Failed to parse '{}' as usize in base 10, err: {}", val, err);

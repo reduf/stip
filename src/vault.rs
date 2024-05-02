@@ -1,19 +1,24 @@
 #![allow(clippy::needless_return)]
 
 use std::path::{PathBuf, Path};
+use std::collections::HashMap;
 use keepass::{
     db::NodeRef,
     Database,
     DatabaseKey,
 };
+use uuid::Uuid;
 
-use crate::{otpauth, stb_image};
+use crate::{otpauth, stb_image::{self, Channel, Image}};
 
 #[derive(Debug)]
 pub struct Error;
 
 pub struct Vault {
-    content: Vec<u8>,
+    pub path: PathBuf,
+    pub database: Database,
+    pub custom_icons: Vec<Image>,
+    custom_icons_idx: HashMap<Uuid, usize>,
 }
 
 pub struct VaultSecret {
@@ -21,6 +26,7 @@ pub struct VaultSecret {
     pub secret: Box<[u8]>,
     pub period: u64,
     pub digits: usize,
+    pub icon: Option<usize>,
 }
 
 impl VaultSecret {
@@ -30,7 +36,7 @@ impl VaultSecret {
             return Error;
         })?;
 
-        let img = stb_image::load_from_memory(content.as_slice(), stb_image::Channel::Grey).map_err(|err| {
+        let img = stb_image::load_from_memory(content.as_slice(), Channel::Grey).map_err(|err| {
             eprintln!("Couldn't read the image {:?}, error: {}", path, err);
             return Error;
         })?;
@@ -58,6 +64,7 @@ impl VaultSecret {
                 secret: parsed.secret.into_boxed_slice(),
                 period: parsed.period,
                 digits: parsed.digits,
+                icon: None,
             });
         } else {
             eprintln!("Failed to detect the QR code of {:?}", path);
@@ -67,25 +74,47 @@ impl VaultSecret {
 }
 
 impl Vault {
-    pub fn open(path: PathBuf) -> Result<Self, Error> {
+    pub fn open(path: PathBuf, password: &str) -> Result<Self, Error> {
         let content = std::fs::read(path.as_path()).map_err(|err| {
             eprintln!("Failed to open {:?}, err: {}", path.as_path(), err);
             return Error;
         })?;
-        return Ok(Self { content });
-    }
 
-    pub fn list(&self, password: Option<&str>) -> Result<Vec<VaultSecret>, Error> {
-        let key = DatabaseKey::new().with_password(password.unwrap_or(""));
-        let database = Database::parse(self.content.as_slice(), key).map_err(|err| {
+        let key = DatabaseKey::new().with_password(password);
+        let database = Database::parse(content.as_slice(), key).map_err(|err| {
             eprintln!("Failed to read database, err: {}", err);
             return Error;
         })?;
 
-        let mut results = Vec::new();
-        for (idx, node) in database.root.iter().enumerate() {
+        let mut custom_icons: Vec<Image> = Vec::new();
+        let mut custom_icons_idx: HashMap<Uuid, usize> = HashMap::new();
+        for (idx, icon) in database.meta.custom_icons.icons.iter().enumerate() {
+            if let Ok(img) = stb_image::load_from_memory(icon.data.as_slice(), Channel::Rgba) {
+                custom_icons.push(img);
+                custom_icons_idx.insert(icon.uuid, custom_icons.len() - 1);
+            } else {
+                eprintln!("Failed to load custom icon {}", idx);
+            }
+        }
+
+        return Ok(Vault {
+            path,
+            database,
+            custom_icons,
+            custom_icons_idx,
+        });
+    }
+
+    pub fn secrets(&self) -> Vec<VaultSecret> {
+        let mut secrets = Vec::new();
+        for (idx, node) in self.database.root.iter().enumerate() {
             if let NodeRef::Entry(entry) = node {
-                let title = entry.get_title().map(str::to_string);
+                let title = entry.get_title().map(str::to_string).unwrap_or_else(|| format!("entry:{}", idx));
+
+                let custom_icon_idx = entry
+                    .custom_icon_uuid
+                    .map(|uuid| self.custom_icons_idx.get(&uuid).cloned())
+                    .flatten();
 
                 if let Some(url) = entry.get_url() {
                     let parsed = match otpauth::ParsedUrl::parse(&url) {
@@ -93,29 +122,26 @@ impl Vault {
                         Err(err) => {
                             eprintln!(
                                 "Failed to parse URL found in QR code of '{}', error: {:?}",
-                                title.unwrap_or_else(|| format!("id:{}", idx)),
+                                title,
                                 err,
                             );
                             continue;
                         }
                     };
 
-                    let name = title.unwrap_or_else(|| format!("{}: {}", parsed.issuer, parsed.account_name));
-                    results.push(VaultSecret {
-                        name,
+                    secrets.push(VaultSecret {
+                        name: title,
                         secret: parsed.secret.into_boxed_slice(),
                         period: parsed.period,
                         digits: parsed.digits,
+                        icon: custom_icon_idx,
                     });
                 } else {
-                    eprintln!(
-                        "Skipping '{}', because the entry doesn't have an url",
-                        title.unwrap_or_else(|| format!("id:{}", idx)),
-                    );
+                    eprintln!("Skipping '{}', because the entry doesn't have an url", title);
                 }
             }
         }
 
-        return Ok(results);
+        return secrets;
     }
 }

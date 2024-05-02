@@ -20,7 +20,9 @@ impl Row {
 struct App {
     password_modal: Option<PasswordWindow>,
     rows: Vec<Row>,
+    icon_textures: Vec<egui::TextureHandle>,
     dropped_files: Vec<egui::DroppedFile>,
+    db_path: Option<PathBuf>,
     database: Option<vault::Vault>,
 }
 
@@ -131,18 +133,34 @@ pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
 
 impl App {
     fn new(input: Option<&str>) -> App {
-        let database = input.map(|path| vault::Vault::open(PathBuf::from(path)).ok()).flatten();
         return Self {
             password_modal: None,
             rows: Vec::new(),
             dropped_files: Vec::new(),
-            database,
+            icon_textures: Vec::new(),
+            db_path: input.map(PathBuf::from),
+            database: None,
         };
     }
 
     fn pick_database() -> Option<PathBuf> {
         let file_dialog = FileDialog::new();
         return file_dialog.pick_file();
+    }
+
+    fn add_texture_from_image(
+        icon_textures: &mut Vec<egui::TextureHandle>,
+        ctx: &egui::Context,
+        img: &stb_image::Image
+    ) {
+        icon_textures.push(ctx.load_texture(
+            format!("icon:{}", icon_textures.len()),
+            egui::ColorImage::from_rgba_unmultiplied(
+                [img.width, img.height],
+                img.data(),
+            ),
+            Default::default(),
+        ));
     }
 
     fn show_menu(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
@@ -153,7 +171,7 @@ impl App {
                 if ui.button("Open").clicked() {
                     if let Some(path) = Self::pick_database() {
                         self.rows.clear();
-                        self.database = vault::Vault::open(path).ok();
+                        self.db_path = Some(path);
                     }
                 }
             });
@@ -188,6 +206,11 @@ impl App {
                 }
                 ui.label(&token_text);
 
+                if let Some(icon_idx) = row.secret.icon.clone() {
+                    let texture = &self.icon_textures[icon_idx];
+                    ui.image((texture.id(), egui::vec2(texture.aspect_ratio() * 20.0, 20.0)));
+                }
+
                 if row.editing {
                     let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
                         .vertical_align(egui::Align::Center)
@@ -203,6 +226,7 @@ impl App {
                         row.editing = true;
                     }
                 }
+
             });
 
             ui.end_row();
@@ -212,16 +236,20 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.rows.is_empty() && self.password_modal.is_none() && self.database.is_some() {
+        if self.database.is_none() && self.password_modal.is_none() && self.db_path.is_some() {
             self.password_modal = Some(PasswordWindow::open());
         }
 
         if let Some(mut window) = self.password_modal.take() {
             if let Some(password) = window.show(ctx) {
-                if let Some(database) = self.database.as_ref() {
-                    if let Ok(authenticodes) = database.list(Some(password.as_ref())) {
-                        self.rows = authenticodes.into_iter().map(Row::new).collect::<Vec<Row>>();
+                if let Some(path) = self.db_path.take() {
+                    if let Ok(database) = vault::Vault::open(path.clone(), password.as_ref()) {
+                        self.rows = database.secrets().into_iter().map(Row::new).collect::<Vec<Row>>();
+                        for icon in database.custom_icons.iter() {
+                            Self::add_texture_from_image(&mut self.icon_textures, ctx, icon);
+                        }
                     } else {
+                        self.db_path = Some(path);
                         self.password_modal = Some(window.failed());
                     }
                 }
