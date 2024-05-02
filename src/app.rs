@@ -212,7 +212,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.rows.is_empty() && self.password_modal.is_none() {
+        if self.rows.is_empty() && self.password_modal.is_none() && self.database.is_some() {
             self.password_modal = Some(PasswordWindow::open());
         }
 
