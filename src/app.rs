@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::{password, totp, vault};
+use crate::{password, stb_image, totp, vault};
 use std::path::PathBuf;
 use rfd::FileDialog;
 
@@ -71,11 +71,26 @@ impl PasswordWindow {
     }
 }
 
+fn load_icon() -> Option<egui::IconData> {
+    let buffer = include_bytes!("../assets/shield-96.png");
+    if let Ok(img) = stb_image::load_from_memory(buffer.as_ref(), stb_image::Channel::Rgba) {
+        let rgba_bytes = img.data().to_vec();
+        return Some(egui::IconData {
+            rgba: rgba_bytes,
+            width: img.width as u32,
+            height: img.height as u32,
+        });
+    } else {
+        return None;
+    }
+}
+
 pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([320.0, 480.0])
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(load_icon().unwrap()),
         ..Default::default()
     };
 

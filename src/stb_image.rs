@@ -13,15 +13,26 @@ extern "C" {
     pub fn free(ptr: *mut c_void);
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Channel {
+    Default = 0,
+    Grey = 1,
+    GreyAlpha = 2,
+    Rgb = 3,
+    Rgba = 4,
+}
+
+
 pub struct Image {
     pub width: usize,
     pub height: usize,
+    pub bytes_per_pixel: usize,
     data: *mut u8,
 }
 
 impl Image {
     pub fn data(&self) -> &[u8] {
-        let len = (self.width * self.height) as usize;
+        let len = self.width * self.height * self.bytes_per_pixel;
         return unsafe { std::slice::from_raw_parts(self.data, len) };
     }
 }
@@ -35,7 +46,7 @@ impl Drop for Image {
     }
 }
 
-pub fn load_bytes(bytes: &[u8]) -> Result<Image, &'static str> {
+pub fn load_from_memory(bytes: &[u8], channel: Channel) -> Result<Image, &'static str> {
     let mut width = 0;
     let mut height = 0;
     let mut channels_in_file = 0;
@@ -46,13 +57,20 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Image, &'static str> {
             &mut width,
             &mut height,
             &mut channels_in_file,
-            1 /* STBI_grey */,
+            channel as i32,
         )
+    };
+
+    let bytes_per_pixel = if channel == Channel::Default {
+        channels_in_file as usize
+    } else {
+        channel as usize
     };
 
     return Ok(Image {
         width: width as usize,
         height: height as usize,
+        bytes_per_pixel,
         data: image,
     });
 }

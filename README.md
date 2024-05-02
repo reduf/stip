@@ -36,3 +36,7 @@ It may be desirable to not store your password in the command line argument, so 
 > stip.exe tests/data/encrypted-with-password-noreply.example.zip/noreply.example.png -p
 Enter password:
 ```
+
+## Icon attributions
+
+- <a href="https://www.flaticon.com/free-icons/security" title="security icons">Security icons created by Freepik - Flaticon</a>

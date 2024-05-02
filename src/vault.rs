@@ -117,7 +117,7 @@ impl Vault {
 }
 
 fn read_secret(output: &mut VaultSecret, image_bytes: &[u8]) -> Result<(), Error> {
-    let img = stb_image::load_bytes(image_bytes).map_err(|err| {
+    let img = stb_image::load_from_memory(image_bytes, stb_image::Channel::Grey).map_err(|err| {
         eprintln!("Couldn't read the image '{}', error: {}", output.filename, err);
         return Error;
     })?;
