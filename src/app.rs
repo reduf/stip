@@ -166,8 +166,13 @@ impl App {
 
                 let request_copy_into_clipboard = ui.add_sized([24.0, 24.0], button).clicked();
 
-                let token = totp::from_now(row.secret.secret.as_ref(), 6);
-                let token_text = format!("{:06}", token.number);
+                let token = totp::from_now_with_period(
+                    row.secret.secret.as_ref(),
+                    row.secret.period,
+                    row.secret.digits,
+                );
+
+                let token_text = format!("{:0digits$}", token.number, digits = row.secret.digits);
                 if request_copy_into_clipboard {
                     ui.output_mut(|o| o.copied_text = token_text.clone());
                 }
@@ -197,9 +202,7 @@ impl App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.rows.is_empty() && self.password_modal.is_none() {
-            if let Some(database) = self.database.as_ref() {
-                self.password_modal = Some(PasswordWindow::open());
-            }
+            self.password_modal = Some(PasswordWindow::open());
         }
 
         if let Some(mut window) = self.password_modal.take() {

@@ -17,6 +17,8 @@ pub struct ParsedUrl {
     pub account_name: String,
     pub issuer: String,
     pub secret: Vec<u8>,
+    pub period: u64,
+    pub digits: usize,
 }
 
 impl ParsedUrl {
@@ -48,6 +50,8 @@ impl ParsedUrl {
         };
 
         let mut secret = None;
+        let mut digits = 6;
+        let mut period = 30;
 
         let query = res.query().ok_or(ParseError::IncompleteQuery)?;
         for (key, val) in form_urlencoded::parse(query.as_ref()) {
@@ -63,6 +67,16 @@ impl ParsedUrl {
                 } else {
                     issuer = Some(val.into_owned());
                 }
+            } else if key == "digits" {
+                digits = usize::from_str_radix(&val, 10).map_err(|err| {
+                    eprintln!("Failed to parse '{}' as usize in base 10, err: {}", val, err);
+                    return ParseError::InvalidUrl;
+                })?;
+            } else if key == "period" {
+                period = u64::from_str_radix(&val, 10).map_err(|err| {
+                    eprintln!("Failed to parse '{}' as u64 in base 10, err: {}", val, err);
+                    return ParseError::InvalidUrl;
+                })?;
             }
         }
 
@@ -74,6 +88,8 @@ impl ParsedUrl {
             account_name,
             issuer: issuer.ok_or(ParseError::IncompleteQuery)?,
             secret: secret.ok_or(ParseError::IncompleteQuery)?,
+            period,
+            digits,
         });
     }
 }
@@ -84,13 +100,15 @@ mod tests {
 
     #[test]
     fn issuer_is_a_query_value() {
-        let res = ParsedUrl::parse("otpauth://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====&issuer=BigTech").unwrap();
-        assert_eq!(res.label.as_str(), "Company:example@company.com");
+        let res = ParsedUrl::parse("otpauth://totp/BigTech%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====&issuer=BigTech&digits=10&period=35").unwrap();
+        assert_eq!(res.account_name.as_str(), "example@company.com");
         assert_eq!(res.issuer.as_str(), "BigTech");
         assert_eq!(
             res.secret.as_slice(),
             b"\x32\x92\x44\x5F\x2F\xED\xD8\xCD\xFD\x84\x72\x19"
         );
+        assert_eq!(res.digits, 10);
+        assert_eq!(res.period, 35);
     }
 
     #[test]
@@ -99,7 +117,7 @@ mod tests {
             "otpauth://totp/Company%3Aexample%40company.com?secret=gkjeixzp5xmm37meoimq====",
         )
         .unwrap();
-        assert_eq!(res.label.as_str(), "Company:example@company.com");
+        assert_eq!(res.account_name.as_str(), "example@company.com");
         assert_eq!(res.issuer.as_str(), "Company");
         assert_eq!(
             res.secret.as_slice(),

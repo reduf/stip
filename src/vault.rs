@@ -19,6 +19,8 @@ pub struct Vault {
 pub struct VaultSecret {
     pub name: String,
     pub secret: Box<[u8]>,
+    pub period: u64,
+    pub digits: usize,
 }
 
 impl VaultSecret {
@@ -54,6 +56,8 @@ impl VaultSecret {
             return Ok(VaultSecret {
                 name: format!("{}: {}", parsed.issuer, parsed.account_name),
                 secret: parsed.secret.into_boxed_slice(),
+                period: parsed.period,
+                digits: parsed.digits,
             });
         } else {
             eprintln!("Failed to detect the QR code of {:?}", path);
@@ -100,6 +104,8 @@ impl Vault {
                     results.push(VaultSecret {
                         name,
                         secret: parsed.secret.into_boxed_slice(),
+                        period: parsed.period,
+                        digits: parsed.digits,
                     });
                 } else {
                     eprintln!(

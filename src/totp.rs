@@ -41,17 +41,17 @@ pub fn from_seconds(secret: &[u8], timestamp: u64, digits: usize) -> u32 {
     return from_moving_factor(secret, timestamp / 30, digits);
 }
 
-pub fn from_now(secret: &[u8], digits: usize) -> TotpToken {
+pub fn from_now_with_period(secret: &[u8], period: u64, digits: usize) -> TotpToken {
     let created_at = SystemTime::now();
     let seconds = created_at
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_secs();
     let not_before = UNIX_EPOCH
-        .checked_add(Duration::new((seconds / 30) * 30, 0))
+        .checked_add(Duration::new((seconds / period) * period, 0))
         .expect("Couldn't create 'not_before'");
     let not_after = not_before
-        .checked_add(Duration::new(30, 0))
+        .checked_add(Duration::new(period, 0))
         .expect("Couldn't create 'not_after'");
     let number = from_seconds(secret, seconds, digits);
     return TotpToken {
