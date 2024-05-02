@@ -166,20 +166,12 @@ impl App {
 
                 let request_copy_into_clipboard = ui.add_sized([24.0, 24.0], button).clicked();
 
-                if let Some(secret) = row.secret.secret.as_deref() {
-                    let token = totp::from_now(secret, 6);
-                    let token_text = format!("{:06}", token.number);
-                    if request_copy_into_clipboard {
-                        ui.output_mut(|o| o.copied_text = token_text.clone());
-                    }
-                    ui.label(&token_text);
-                } else {
-                    let img = egui::Image::new(egui::include_image!("../assets/key.svg"));
-                    let button = egui::ImageButton::new(img);
-                    if ui.add(button).clicked() {
-                        // self.password_modal_open = true;
-                    }
+                let token = totp::from_now(row.secret.secret.as_ref(), 6);
+                let token_text = format!("{:06}", token.number);
+                if request_copy_into_clipboard {
+                    ui.output_mut(|o| o.copied_text = token_text.clone());
                 }
+                ui.label(&token_text);
 
                 if row.editing {
                     let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
@@ -206,11 +198,7 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if self.rows.is_empty() && self.password_modal.is_none() {
             if let Some(database) = self.database.as_ref() {
-                if database.requires_password() {
-                    self.password_modal = Some(PasswordWindow::open());
-                } else {
-                    self.rows = database.list(None).unwrap().into_iter().map(Row::new).collect::<Vec<Row>>();
-                }
+                self.password_modal = Some(PasswordWindow::open());
             }
         }
 
