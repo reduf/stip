@@ -3,9 +3,23 @@ use crate::{password, stb_image, totp, vault};
 use std::path::PathBuf;
 use rfd::FileDialog;
 
+struct Row {
+    secret: vault::VaultSecret,
+    editing: bool,
+}
+
+impl Row {
+    fn new(secret: vault::VaultSecret) -> Self {
+        return Row {
+            secret,
+            editing: false,
+        };
+    }
+}
+
 struct App {
     password_modal: Option<PasswordWindow>,
-    secrets: Vec<vault::VaultSecret>,
+    rows: Vec<Row>,
     dropped_files: Vec<egui::DroppedFile>,
     database: Option<vault::Vault>,
 }
@@ -110,7 +124,7 @@ impl App {
         let database = input.map(|path| vault::Vault::open(PathBuf::from(path)).ok()).flatten();
         return Self {
             password_modal: None,
-            secrets: Vec::new(),
+            rows: Vec::new(),
             dropped_files: Vec::new(),
             database,
         };
@@ -128,7 +142,7 @@ impl App {
             ui.menu_button("File", |ui| {
                 if ui.button("Open").clicked() {
                     if let Some(path) = Self::pick_database() {
-                        self.secrets.clear();
+                        self.rows.clear();
                         self.database = vault::Vault::open(path).ok();
                     }
                 }
@@ -145,14 +159,14 @@ impl App {
     }
 
     fn draw_grid_content(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
-        for row in &self.secrets {
+        for row in self.rows.iter_mut() {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
                 let button = egui::ImageButton::new(img);
 
                 let request_copy_into_clipboard = ui.add_sized([24.0, 24.0], button).clicked();
 
-                if let Some(secret) = row.secret.as_deref() {
+                if let Some(secret) = row.secret.secret.as_deref() {
                     let token = totp::from_now(secret, 6);
                     let token_text = format!("{:06}", token.number);
                     if request_copy_into_clipboard {
@@ -167,7 +181,20 @@ impl App {
                     }
                 }
 
-                ui.add_sized(ui.available_size(), egui::Label::new(&row.name));
+                if row.editing {
+                    let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
+                        .vertical_align(egui::Align::Center)
+                        .horizontal_align(egui::Align::Center);
+                    if ui.add_sized(ui.available_size(), text_edit).lost_focus() {
+                        if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            row.editing = false;
+                        }
+                    }
+                } else {
+                    if ui.add_sized(ui.available_size(), egui::Label::new(&row.secret.name)).double_clicked() {
+                        row.editing = true;
+                    }
+                }
             });
 
             ui.end_row();
@@ -177,12 +204,12 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.secrets.is_empty() && self.password_modal.is_none() {
+        if self.rows.is_empty() && self.password_modal.is_none() {
             if let Some(database) = self.database.as_ref() {
                 if database.requires_password() {
                     self.password_modal = Some(PasswordWindow::open());
                 } else {
-                    self.secrets = database.list(None).unwrap();
+                    self.rows = database.list(None).unwrap().into_iter().map(Row::new).collect::<Vec<Row>>();
                 }
             }
         }
@@ -191,7 +218,7 @@ impl eframe::App for App {
             if let Some(password) = window.show(ctx) {
                 if let Some(database) = self.database.as_ref() {
                     if let Ok(authenticodes) = database.list(Some(password.as_ref())) {
-                        self.secrets = authenticodes;
+                        self.rows = authenticodes.into_iter().map(Row::new).collect::<Vec<Row>>();
                     } else {
                         self.password_modal = Some(window);
                     }
@@ -233,7 +260,7 @@ impl eframe::App for App {
         for file in self.dropped_files.iter() {
             if let Some(path) = file.path.as_deref() {
                 match vault::VaultSecret::from_path(path) {
-                    Ok(secret) => self.secrets.push(secret),
+                    Ok(secret) => self.rows.push(Row { secret, editing: false }),
                     Err(err) => eprintln!("Failed to load {:?} as secret, err: {:?}", path, err),
                 }
             }
