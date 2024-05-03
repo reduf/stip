@@ -238,7 +238,8 @@ impl App {
                     }
                 }
             } else {
-                if ui.add_sized(first_column_size, egui::Label::new(&row.secret.name)).double_clicked() {
+                let label = egui::Label::new(&row.secret.name).truncate(true);
+                if ui.add_sized(first_column_size, label).double_clicked() {
                     row.editing = true;
                 }
             }
