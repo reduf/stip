@@ -225,48 +225,45 @@ impl App {
     }
 
     fn draw_grid_content(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+        let first_column_size = [175.0, ui.available_height()];
         for row in self.rows.iter_mut() {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
-                let button = egui::ImageButton::new(img);
+            if row.editing {
+                let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
+                    .vertical_align(egui::Align::Center)
+                    .horizontal_align(egui::Align::Center);
 
-                let request_copy_into_clipboard = ui.add_sized([24.0, 24.0], button).clicked();
-
-                let token = totp::from_now_with_period(
-                    row.secret.secret.as_ref(),
-                    row.secret.period,
-                    row.secret.digits,
-                );
-
-                let token_text = format!("{:0digits$}", token.number, digits = row.secret.digits);
-                if request_copy_into_clipboard {
-                    ui.output_mut(|o| o.copied_text = token_text.clone());
-                }
-                ui.label(&token_text);
-
-                if let Some(icon_idx) = row.secret.icon.clone() {
-                    let texture = &self.icon_textures[icon_idx];
-                    ui.image((texture.id(), egui::vec2(texture.aspect_ratio() * 20.0, 20.0)));
-                }
-
-                if row.editing {
-                    let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
-                        .vertical_align(egui::Align::Center)
-                        .horizontal_align(egui::Align::Center);
-                    if ui.add_sized(ui.available_size(), text_edit).lost_focus() {
-                        row.editing = false;
-
-                        if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        }
-                    }
-                } else {
-                    if ui.add_sized(ui.available_size(), egui::Label::new(&row.secret.name)).double_clicked() {
-                        row.editing = true;
+                if ui.add_sized(first_column_size, text_edit).lost_focus() {
+                    row.editing = false;
+                    if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                     }
                 }
+            } else {
+                if ui.add_sized(first_column_size, egui::Label::new(&row.secret.name)).double_clicked() {
+                    row.editing = true;
+                }
+            }
 
-            });
+            if let Some(icon_idx) = row.secret.icon.clone() {
+                let texture = &self.icon_textures[icon_idx];
+                ui.image((texture.id(), egui::vec2(texture.aspect_ratio() * 20.0, 20.0)));
+            } else {
+                ui.label("");
+            }
 
+            let token = totp::from_now_with_period(
+                row.secret.secret.as_ref(),
+                row.secret.period,
+                row.secret.digits,
+            );
+
+            let token_text = format!("{:0digits$}", token.number, digits = row.secret.digits);
+            ui.label(&token_text);
+
+            let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
+            let button = egui::ImageButton::new(img);
+            if ui.add_sized([24.0, 24.0], button).clicked() {
+                ui.output_mut(|o| o.copied_text = token_text.clone());
+            }
             ui.end_row();
         }
     }
@@ -305,8 +302,7 @@ impl eframe::App for App {
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     egui::Grid::new("my_grid")
-                        .num_columns(1)
-                        .spacing([40.0, 4.0])
+                        .num_columns(4)
                         .striped(true)
                         .show(ui, |ui| self.draw_grid_content(ctx, ui));
                 });
