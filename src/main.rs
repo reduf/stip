@@ -35,14 +35,14 @@ fn main() {
 
     // First check if "-p" or "--password" was specified.
     // When "-p" is specified, and there is still no value, simply prompt for it.
-    let _ = args.password.map(|password| {
+    let password = args.password.map(|password| {
         return password.unwrap_or_else(|| {
             return rpassword::prompt_password("Enter password: ")
                 .expect("Failed to read user password");
         });
     });
 
-    if app::build(args.input.as_deref()).is_err() {
+    if app::build(args.input.as_deref(), password).is_err() {
         eprintln!("Failed to open input '{:?}'", args.input);
     }
 }

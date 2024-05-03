@@ -17,13 +17,25 @@ impl Row {
     }
 }
 
+enum Db {
+    None,
+    Path(PathBuf),
+    Open(vault::Vault),
+}
+
+impl Db {
+    pub fn take(&mut self) -> Self {
+        return std::mem::replace(self, Db::None);
+    }
+}
+
 struct App {
     password_modal: Option<PasswordWindow>,
+    dropped_files: Vec<egui::DroppedFile>,
+
+    database: Db,
     rows: Vec<Row>,
     icon_textures: Vec<egui::TextureHandle>,
-    dropped_files: Vec<egui::DroppedFile>,
-    db_path: Option<PathBuf>,
-    database: Option<vault::Vault>,
 }
 
 struct PasswordWindow {
@@ -111,7 +123,7 @@ fn load_icon() -> Option<egui::IconData> {
     }
 }
 
-pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
+pub fn build(path: Option<&str>, password: Option<String>) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([320.0, 480.0])
@@ -120,27 +132,52 @@ pub fn build(input: Option<&str>) -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
-    let app = Box::new(App::new(input));
+    let mut app = Box::new(App::new(path.map(PathBuf::from)));
     return eframe::run_native(
         "Stip",
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
+
+            if let Some(password) = password {
+                app.try_open_db(&cc.egui_ctx, password.as_str());
+            }
+
             return app;
         }),
     );
 }
 
 impl App {
-    fn new(input: Option<&str>) -> App {
-        return Self {
+    fn new(path: Option<PathBuf>) -> App {
+        let database = path.map(Db::Path).unwrap_or(Db::None);
+        let mut app = Self {
             password_modal: None,
-            rows: Vec::new(),
             dropped_files: Vec::new(),
+            database,
+            rows: Vec::new(),
             icon_textures: Vec::new(),
-            db_path: input.map(PathBuf::from),
-            database: None,
         };
+
+        return app;
+    }
+
+    fn try_open_db(&mut self, ctx: &egui::Context, password: &str) -> bool {
+        if let Db::Path(path) = self.database.take() {
+            if let Ok(vault) = vault::Vault::open(path.clone(), password) {
+                self.rows = vault.secrets().into_iter().map(Row::new).collect::<Vec<Row>>();
+                for icon in vault.custom_icons.iter() {
+                    Self::add_texture_from_image(&mut self.icon_textures, ctx, icon);
+                }
+                self.database = Db::Open(vault);
+                return true;
+            } else {
+                self.database = Db::Path(path);
+                return false;
+            }
+        } else {
+            return false;
+        }
     }
 
     fn pick_database() -> Option<PathBuf> {
@@ -171,7 +208,8 @@ impl App {
                 if ui.button("Open").clicked() {
                     if let Some(path) = Self::pick_database() {
                         self.rows.clear();
-                        self.db_path = Some(path);
+                        self.icon_textures.clear();
+                        self.database = Db::Path(path);
                     }
                 }
             });
@@ -236,22 +274,16 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.database.is_none() && self.password_modal.is_none() && self.db_path.is_some() {
-            self.password_modal = Some(PasswordWindow::open());
+        if self.password_modal.is_none() {
+            if let Db::Path(_) = self.database {
+                self.password_modal = Some(PasswordWindow::open());
+            }
         }
 
         if let Some(mut window) = self.password_modal.take() {
             if let Some(password) = window.show(ctx) {
-                if let Some(path) = self.db_path.take() {
-                    if let Ok(database) = vault::Vault::open(path.clone(), password.as_ref()) {
-                        self.rows = database.secrets().into_iter().map(Row::new).collect::<Vec<Row>>();
-                        for icon in database.custom_icons.iter() {
-                            Self::add_texture_from_image(&mut self.icon_textures, ctx, icon);
-                        }
-                    } else {
-                        self.db_path = Some(path);
-                        self.password_modal = Some(window.failed());
-                    }
+                if !self.try_open_db(ctx, password.as_ref()) {
+                    self.password_modal = Some(window.failed());
                 }
             } else {
                 self.password_modal = Some(window);
