@@ -206,6 +206,7 @@ impl App {
         menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
                 if ui.button("Open").clicked() {
+                    ui.close_menu();
                     if let Some(path) = Self::pick_database() {
                         self.rows.clear();
                         self.icon_textures.clear();
