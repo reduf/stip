@@ -3,6 +3,8 @@ use crate::{password, stb_image, totp, vault};
 use std::path::PathBuf;
 use rfd::FileDialog;
 
+const ICON_DIM: f32 = 28.0;
+
 struct Row {
     secret: vault::VaultSecret,
     editing: bool,
@@ -247,7 +249,7 @@ impl App {
 
             if let Some(icon_idx) = row.secret.icon.clone() {
                 let texture = &self.icon_textures[icon_idx];
-                ui.image((texture.id(), egui::vec2(texture.aspect_ratio() * 20.0, 20.0)));
+                ui.image((texture.id(), egui::vec2(texture.aspect_ratio() * ICON_DIM, ICON_DIM)));
             } else {
                 ui.label("");
             }
@@ -263,7 +265,7 @@ impl App {
 
             let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
             let button = egui::ImageButton::new(img);
-            if ui.add_sized([24.0, 24.0], button).clicked() {
+            if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
                 ui.output_mut(|o| o.copied_text = token_text.clone());
             }
             ui.end_row();
