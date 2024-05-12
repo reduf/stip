@@ -34,7 +34,7 @@ pub fn b32decode(input: &[u8]) -> Result<Vec<u8>, ParseError> {
         buffer = (buffer << 5) | value(char)? as u32;
         left += 5;
 
-        if left >= 8 {
+        if 8 <= left {
             result.push((buffer >> (left - 8)) as u8);
             buffer &= 0xFF;
             left -= 8;
@@ -42,6 +42,84 @@ pub fn b32decode(input: &[u8]) -> Result<Vec<u8>, ParseError> {
     }
 
     return Ok(result);
+}
+
+pub fn b32encode(input: &[u8]) -> String {
+    fn value(bits: usize) -> char {
+        const BASE32: &'static [u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        return BASE32[bits & 0x1F] as char;
+    }
+
+    fn pad(buffer: &mut String, count: usize) {
+        for _ in 0..count {
+            buffer.push('=');
+        }
+    }
+
+    let mut buffer = 0u64;
+    let mut left = 0u64;
+
+    let mut result = String::with_capacity(((input.len() * 8) + (4)) / 5);
+    for byte in input.iter().copied() {
+        buffer = (buffer << 8) | (byte as u64);
+        left += 8;
+
+        if left == 40 {
+            result.push(value(((buffer >> 35) & 0x1F) as usize));
+            result.push(value(((buffer >> 30) & 0x1F) as usize));
+            result.push(value(((buffer >> 25) & 0x1F) as usize));
+            result.push(value(((buffer >> 20) & 0x1F) as usize));
+            result.push(value(((buffer >> 15) & 0x1F) as usize));
+            result.push(value(((buffer >> 10) & 0x1F) as usize));
+            result.push(value(((buffer >>  5) & 0x1F) as usize));
+            result.push(value(((buffer >>  0) & 0x1F) as usize));
+
+            left = 0;
+            buffer = 0;
+        }
+    }
+
+    match left {
+        0 => (),
+        8 => {
+            buffer = buffer << 2;
+            result.push(value(((buffer >> 5) & 0x1F) as usize));
+            result.push(value(((buffer >> 0) & 0x1F) as usize));
+            pad(&mut result, 6);
+        },
+        16 => {
+            buffer = buffer << 4;
+            result.push(value(((buffer >> 15) & 0x1F) as usize));
+            result.push(value(((buffer >> 10) & 0x1F) as usize));
+            result.push(value(((buffer >> 5)  & 0x1F) as usize));
+            result.push(value(((buffer >> 0)  & 0x1F) as usize));
+            pad(&mut result, 4);
+        },
+        24 => {
+            buffer = buffer << 1;
+            result.push(value(((buffer >> 20) & 0x1F) as usize));
+            result.push(value(((buffer >> 15) & 0x1F) as usize));
+            result.push(value(((buffer >> 10) & 0x1F) as usize));
+            result.push(value(((buffer >> 5)  & 0x1F) as usize));
+            result.push(value(((buffer >> 0)  & 0x1F) as usize));
+            pad(&mut result, 3);
+
+        },
+        32 => {
+            buffer = buffer << 3;
+            result.push(value(((buffer >> 30) & 0x1F) as usize));
+            result.push(value(((buffer >> 25) & 0x1F) as usize));
+            result.push(value(((buffer >> 20) & 0x1F) as usize));
+            result.push(value(((buffer >> 15) & 0x1F) as usize));
+            result.push(value(((buffer >> 10) & 0x1F) as usize));
+            result.push(value(((buffer >> 5)  & 0x1F) as usize));
+            result.push(value(((buffer >> 0)  & 0x1F) as usize));
+            pad(&mut result, 1);
+        },
+        _ => unreachable!(),
+    }
+
+    return result;
 }
 
 #[cfg(test)]
@@ -63,7 +141,7 @@ mod tests {
     #[test]
     fn test_good_base32_strings() {
         for (input, expected) in GOOD_BASE32_TESTS {
-            assert_eq!(super::b32decode(&input).unwrap().as_slice(), *expected,);
+            assert_eq!(super::b32decode(&input).unwrap().as_slice(), *expected);
         }
     }
 
@@ -71,6 +149,13 @@ mod tests {
     fn test_bad_base32_strings() {
         for input in BAD_BASE32_TESTS {
             super::b32decode(&input).unwrap_err();
+        }
+    }
+
+    #[test]
+    fn test_good_b32encode() {
+        for (expected, input) in GOOD_BASE32_TESTS {
+            assert_eq!(super::b32encode(&input).as_bytes(), expected.to_ascii_uppercase());
         }
     }
 }
