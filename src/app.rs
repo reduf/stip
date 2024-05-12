@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::{password, stb_image, totp, vault};
+use crate::{password, stb_image, totp, vault, base32::b32encode};
 use std::path::PathBuf;
 use rfd::FileDialog;
 
@@ -8,6 +8,7 @@ const ICON_DIM: f32 = 28.0;
 struct Row {
     secret: vault::VaultSecret,
     editing: bool,
+    show_details: bool,
 }
 
 impl Row {
@@ -15,6 +16,7 @@ impl Row {
         return Row {
             secret,
             editing: false,
+            show_details: false,
         };
     }
 }
@@ -227,9 +229,9 @@ impl App {
         });
     }
 
-    fn draw_grid_content(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+    fn draw_grid_content(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         let first_column_size = [175.0, ui.available_height()];
-        for row in self.rows.iter_mut() {
+        for (idx, row) in self.rows.iter_mut().enumerate() {
             if row.editing {
                 let text_edit = egui::TextEdit::singleline(&mut row.secret.name)
                     .vertical_align(egui::Align::Center)
@@ -242,9 +244,21 @@ impl App {
                 }
             } else {
                 let label = egui::Label::new(&row.secret.name).truncate(true);
-                if ui.add_sized(first_column_size, label).double_clicked() {
+                let response = ui.add_sized(first_column_size, label);
+                if response.double_clicked() {
                     row.editing = true;
                 }
+
+                response.context_menu(|ui| {
+                    if ui.button("Show details").clicked() {
+                        row.show_details = true;
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Close the menu").clicked() {
+                        ui.close_menu();
+                    }
+                });
             }
 
             if let Some(icon_idx) = row.secret.icon.clone() {
@@ -268,7 +282,13 @@ impl App {
             if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
                 ui.output_mut(|o| o.copied_text = token_text.clone());
             }
+
             ui.end_row();
+
+
+            if row.show_details {
+                row.draw_details_window(idx, ctx);
+            }
         }
     }
 }
@@ -322,12 +342,50 @@ impl eframe::App for App {
         for file in self.dropped_files.iter() {
             if let Some(path) = file.path.as_deref() {
                 match vault::VaultSecret::from_path(path) {
-                    Ok(secret) => self.rows.push(Row { secret, editing: false }),
+                    Ok(secret) => self.rows.push(Row::new(secret)),
                     Err(err) => eprintln!("Failed to load {:?} as secret, err: {:?}", path, err),
                 }
             }
         }
 
         self.dropped_files.clear();
+    }
+}
+
+impl Row {
+    fn draw_details_window_central_panel(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
+        egui::Grid::new("my_grid").spacing([40.0, 4.0]).num_columns(2).show(ui, |ui| {
+            ui.label("name:");
+            ui.add(egui::Label::new(self.secret.name.as_str()));
+            ui.end_row();
+            ui.label("secret:");
+            ui.label(b32encode(self.secret.secret.as_ref()));
+            ui.end_row();
+            ui.label("period:");
+            ui.label(format!("{}", self.secret.period));
+            ui.end_row();
+            ui.label("digits:");
+            ui.label(format!("{}", self.secret.digits));
+            ui.end_row();
+        });
+    }
+
+    fn draw_details_window(&mut self, idx: usize, ctx: &egui::Context) {
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of(format!("viewport-details:{}", idx)),
+            egui::ViewportBuilder::default()
+                .with_title(format!("Details for {}", self.secret.name))
+                .with_inner_size([350.0, 100.0]),
+                |ctx, _class| {
+                    egui::CentralPanel::default().show(ctx, |ui| {
+                        self.draw_details_window_central_panel(ctx, ui);
+                    });
+
+                    if ctx.input(|i| i.viewport().close_requested()) {
+                        // Tell parent viewport that we should not show next frame:
+                        self.show_details = false;
+                    }
+                },
+        );
     }
 }
