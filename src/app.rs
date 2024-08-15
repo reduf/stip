@@ -220,11 +220,24 @@ impl App {
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                let img = egui::Image::new(egui::include_image!("../assets/plus.svg"));
-                let button = egui::Button::image_and_text(img, "Add");
+                let img = egui::include_image!("../assets/plus.svg");
+                ui.menu_image_button(img, |ui| {
+                    if ui.button("Capture").clicked() {
+                        ui.close_menu();
+                    }
 
-                if ui.add(button).clicked() {
-                }
+                    if ui.button("Add from clipboard").clicked() {
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Add manually").clicked() {
+                        ui.close_menu();
+                    }
+
+                    if ui.button("Close the menu").clicked() {
+                        ui.close_menu();
+                    }
+                });
             });
         });
     }
