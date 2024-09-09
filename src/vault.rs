@@ -23,9 +23,7 @@ pub struct Vault {
 
 pub struct VaultSecret {
     pub name: String,
-    pub secret: Box<[u8]>,
-    pub period: u64,
-    pub digits: usize,
+    parsed_url: otpauth::ParsedUrl,
     pub icon: Option<usize>,
 }
 
@@ -54,22 +52,36 @@ impl VaultSecret {
                 })?
                 .1;
 
-            let parsed = otpauth::ParsedUrl::parse(&content).map_err(|err| {
+            let parsed_url = otpauth::ParsedUrl::parse(content).map_err(|err| {
                 eprintln!("Failed to parse URL found in QR code of {:?}, error: {:?}", path, err);
                 return Error;
             })?;
 
             return Ok(VaultSecret {
-                name: format!("{}: {}", parsed.issuer, parsed.account_name),
-                secret: parsed.secret.into_boxed_slice(),
-                period: parsed.period,
-                digits: parsed.digits,
+                name: format!("{}: {}", parsed_url.issuer, parsed_url.account_name),
+                parsed_url: parsed_url,
                 icon: None,
             });
         } else {
             eprintln!("Failed to detect the QR code of {:?}", path);
             return Err(Error);
         }
+    }
+
+    pub fn url(&self) -> &str {
+        return self.parsed_url.raw.as_ref();
+    }
+
+    pub fn secret(&self) -> &[u8] {
+        return self.parsed_url.secret.as_slice();
+    }
+
+    pub fn period(&self) -> u64 {
+        return self.parsed_url.period;
+    }
+
+    pub fn digits(&self) -> usize {
+        return self.parsed_url.digits;
     }
 }
 
@@ -117,8 +129,8 @@ impl Vault {
                     .flatten();
 
                 if let Some(url) = entry.get_url() {
-                    let parsed = match otpauth::ParsedUrl::parse(&url) {
-                        Ok(parsed) => parsed,
+                    let parsed_url = match otpauth::ParsedUrl::parse(url.to_string()) {
+                        Ok(parsed_url) => parsed_url,
                         Err(err) => {
                             eprintln!(
                                 "Failed to parse URL found in QR code of '{}', error: {:?}",
@@ -131,9 +143,7 @@ impl Vault {
 
                     secrets.push(VaultSecret {
                         name: title,
-                        secret: parsed.secret.into_boxed_slice(),
-                        period: parsed.period,
-                        digits: parsed.digits,
+                        parsed_url: parsed_url,
                         icon: custom_icon_idx,
                     });
                 } else {

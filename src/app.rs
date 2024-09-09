@@ -282,12 +282,12 @@ impl App {
             }
 
             let token = totp::from_now_with_period(
-                row.secret.secret.as_ref(),
-                row.secret.period,
-                row.secret.digits,
+                row.secret.secret(),
+                row.secret.period(),
+                row.secret.digits(),
             );
 
-            let token_text = format!("{:0digits$}", token.number, digits = row.secret.digits);
+            let token_text = format!("{:0digits$}", token.number, digits = row.secret.digits());
             ui.label(&token_text);
 
             let img = egui::Image::new(egui::include_image!("../assets/copy.svg"));
@@ -367,19 +367,91 @@ impl eframe::App for App {
 
 impl Row {
     fn draw_details_window_central_panel(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
-        egui::Grid::new("my_grid").spacing([40.0, 4.0]).num_columns(2).show(ui, |ui| {
+        egui::Grid::new("my_grid").num_columns(2).show(ui, |ui| {
+            let img = egui::include_image!("../assets/copy.svg");
+
+            let cursor_height = ui.cursor().height();
+
+            ui.label("url:");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let img = egui::include_image!("../assets/copy.svg");
+                let button = egui::ImageButton::new(egui::Image::new(img));
+                if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
+                    ui.output_mut(|o| o.copied_text = self.secret.url().to_string());
+                }
+
+                let mut url: String = self.secret.url().to_string();
+                return ui.add_sized(
+                    [ui.available_width(), cursor_height],
+                    egui::TextEdit::singleline(&mut url),
+                );
+            });
+
+            ui.end_row();
             ui.label("name:");
-            ui.add(egui::Label::new(self.secret.name.as_str()));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let img = egui::include_image!("../assets/copy.svg");
+                let button = egui::ImageButton::new(egui::Image::new(img));
+                if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
+                    ui.output_mut(|o| o.copied_text = self.secret.name.clone());
+                }
+
+                return ui.add_sized(
+                    [ui.available_width(), cursor_height],
+                    egui::TextEdit::singleline(&mut self.secret.name),
+                );
+            });
+
             ui.end_row();
             ui.label("secret:");
-            ui.label(b32encode(self.secret.secret.as_ref()));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let mut secret = b32encode(self.secret.secret());
+
+                let img = egui::include_image!("../assets/copy.svg");
+                let button = egui::ImageButton::new(egui::Image::new(img));
+                if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
+                    ui.output_mut(|o| o.copied_text = secret.clone());
+                }
+
+                ui.add_sized(
+                    [ui.available_width(), cursor_height],
+                    egui::TextEdit::singleline(&mut secret),
+                );
+            });
+
             ui.end_row();
             ui.label("period:");
-            ui.label(format!("{}", self.secret.period));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let mut period = format!("{}", self.secret.period());
+
+                let img = egui::include_image!("../assets/copy.svg");
+                let button = egui::ImageButton::new(egui::Image::new(img));
+                if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
+                    ui.output_mut(|o| o.copied_text = period.clone());
+                }
+
+                return ui.add_sized(
+                    [ui.available_width(), cursor_height],
+                    egui::TextEdit::singleline(&mut period),
+                );
+            });
+
             ui.end_row();
             ui.label("digits:");
-            ui.label(format!("{}", self.secret.digits));
-            ui.end_row();
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let mut digit = format!("{}", self.secret.digits());
+
+                let img = egui::include_image!("../assets/copy.svg");
+                let button = egui::ImageButton::new(egui::Image::new(img));
+                if ui.add_sized([ICON_DIM, ICON_DIM], button).clicked() {
+                    ui.output_mut(|o| o.copied_text = digit.clone());
+                }
+
+                return ui.add_sized(
+                    [ui.available_width(), cursor_height],
+                    egui::TextEdit::singleline(&mut digit),
+                );
+            });
         });
     }
 
@@ -388,7 +460,7 @@ impl Row {
             egui::ViewportId::from_hash_of(format!("viewport-details:{}", idx)),
             egui::ViewportBuilder::default()
                 .with_title(format!("Details for {}", self.secret.name))
-                .with_inner_size([350.0, 100.0]),
+                .with_inner_size([500.0, 400.0]),
                 |ctx, _class| {
                     egui::CentralPanel::default().show(ctx, |ui| {
                         self.draw_details_window_central_panel(ctx, ui);

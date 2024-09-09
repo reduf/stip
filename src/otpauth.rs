@@ -14,6 +14,7 @@ pub enum ParseError {
 
 #[derive(Debug, Clone)]
 pub struct ParsedUrl {
+    pub raw: String,
     pub account_name: String,
     pub issuer: String,
     pub secret: Vec<u8>,
@@ -22,8 +23,8 @@ pub struct ParsedUrl {
 }
 
 impl ParsedUrl {
-    pub fn parse(path: &str) -> Result<ParsedUrl, ParseError> {
-        let res = Url::parse(path).map_err(|_err| {
+    pub fn parse(path: String) -> Result<ParsedUrl, ParseError> {
+        let res = Url::parse(path.as_str()).map_err(|_err| {
             return ParseError::InvalidUrl;
         })?;
 
@@ -79,6 +80,7 @@ impl ParsedUrl {
         }
 
         return Ok(ParsedUrl {
+            raw: path,
             account_name,
             issuer: issuer.ok_or(ParseError::IncompleteQuery)?,
             secret: secret.ok_or(ParseError::IncompleteQuery)?,
