@@ -365,6 +365,24 @@ impl eframe::App for App {
     }
 }
 
+pub struct FakeMutableStr<'a>(&'a str);
+impl<'a> egui::widgets::text_edit::TextBuffer for FakeMutableStr<'a> {
+    fn is_mutable(&self) -> bool {
+        return true;
+    }
+
+    fn insert_text(&mut self, _text: &str, _ch_idx: usize) -> usize {
+        return 0;
+    }
+
+    fn delete_char_range(&mut self, _ch_range: std::ops::Range<usize>) {
+    }
+
+    fn as_str(&self) -> &str {
+        return self.0;
+    }
+}
+
 impl Row {
     fn draw_details_window_central_panel(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::Grid::new("my_grid").num_columns(2).show(ui, |ui| {
@@ -380,10 +398,9 @@ impl Row {
                     ui.output_mut(|o| o.copied_text = self.secret.url().to_string());
                 }
 
-                let mut url: String = self.secret.url().to_string();
                 return ui.add_sized(
                     [ui.available_width(), cursor_height],
-                    egui::TextEdit::singleline(&mut url),
+                    egui::TextEdit::singleline(&mut FakeMutableStr(self.secret.url())),
                 );
             });
 
@@ -398,7 +415,7 @@ impl Row {
 
                 return ui.add_sized(
                     [ui.available_width(), cursor_height],
-                    egui::TextEdit::singleline(&mut self.secret.name),
+                    egui::TextEdit::singleline(&mut FakeMutableStr(self.secret.name.as_str())),
                 );
             });
 
@@ -415,7 +432,7 @@ impl Row {
 
                 ui.add_sized(
                     [ui.available_width(), cursor_height],
-                    egui::TextEdit::singleline(&mut secret),
+                    egui::TextEdit::singleline(&mut FakeMutableStr(secret.as_str())),
                 );
             });
 
@@ -432,7 +449,7 @@ impl Row {
 
                 return ui.add_sized(
                     [ui.available_width(), cursor_height],
-                    egui::TextEdit::singleline(&mut period),
+                    egui::TextEdit::singleline(&mut FakeMutableStr(period.as_str())),
                 );
             });
 
@@ -449,7 +466,7 @@ impl Row {
 
                 return ui.add_sized(
                     [ui.available_width(), cursor_height],
-                    egui::TextEdit::singleline(&mut digit),
+                    egui::TextEdit::singleline(&mut FakeMutableStr(digit.as_str())),
                 );
             });
         });
