@@ -13,6 +13,7 @@ mod totp;
 mod vault;
 mod app;
 mod password;
+mod sys;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

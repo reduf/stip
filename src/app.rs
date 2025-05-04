@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::{password, stb_image, totp, vault, base32::b32encode};
+use crate::{password, stb_image, totp, vault, base32::b32encode, sys};
 use std::path::PathBuf;
 use rfd::FileDialog;
 
@@ -24,7 +24,7 @@ impl Row {
 enum Db {
     None,
     Path(PathBuf),
-    Open(vault::Vault),
+    Opened,
 }
 
 impl Db {
@@ -155,7 +155,7 @@ pub fn build(path: Option<&str>, password: Option<String>) -> Result<(), eframe:
 impl App {
     fn new(path: Option<PathBuf>) -> App {
         let database = path.map(Db::Path).unwrap_or(Db::None);
-        let mut app = Self {
+        let app = Self {
             password_modal: None,
             dropped_files: Vec::new(),
             database,
@@ -173,7 +173,7 @@ impl App {
                 for icon in vault.custom_icons.iter() {
                     Self::add_texture_from_image(&mut self.icon_textures, ctx, icon);
                 }
-                self.database = Db::Open(vault);
+                self.database = Db::Opened;
                 return true;
             } else {
                 self.database = Db::Path(path);
@@ -222,10 +222,25 @@ impl App {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                 let img = egui::include_image!("../assets/plus.svg");
                 ui.menu_image_button(img, |ui| {
+                    /*
                     if ui.button("Capture").clicked() {
                         ui.close_menu();
                     }
+                    */
 
+                    if ui.button("Detect in screen").clicked() {
+                        if let Ok((width, height, data)) = sys::capture_screen() {
+                            match vault::VaultSecret::from_slice(width, height, data.as_slice()) {
+                                Ok(secret) => self.rows.push(Row::new(secret)),
+                                Err(err) => eprintln!("Failed to add the secret detected in the screen, err: {:?}", err),
+                            }
+                        } else {
+                            eprintln!("Couldn't detect any secret in the screen")
+                        }
+                        ui.close_menu();
+                    }
+
+                    /*
                     if ui.button("Add from clipboard").clicked() {
                         ui.close_menu();
                     }
@@ -233,6 +248,7 @@ impl App {
                     if ui.button("Add manually").clicked() {
                         ui.close_menu();
                     }
+                    */
 
                     if ui.button("Close the menu").clicked() {
                         ui.close_menu();
@@ -386,8 +402,6 @@ impl<'a> egui::widgets::text_edit::TextBuffer for FakeMutableStr<'a> {
 impl Row {
     fn draw_details_window_central_panel(&mut self, _ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::Grid::new("my_grid").num_columns(2).show(ui, |ui| {
-            let img = egui::include_image!("../assets/copy.svg");
-
             let cursor_height = ui.cursor().height();
 
             ui.label("url:");
@@ -422,7 +436,7 @@ impl Row {
             ui.end_row();
             ui.label("secret:");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let mut secret = b32encode(self.secret.secret());
+                let secret = b32encode(self.secret.secret());
 
                 let img = egui::include_image!("../assets/copy.svg");
                 let button = egui::ImageButton::new(egui::Image::new(img));
@@ -439,7 +453,7 @@ impl Row {
             ui.end_row();
             ui.label("period:");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let mut period = format!("{}", self.secret.period());
+                let period = format!("{}", self.secret.period());
 
                 let img = egui::include_image!("../assets/copy.svg");
                 let button = egui::ImageButton::new(egui::Image::new(img));
@@ -456,7 +470,7 @@ impl Row {
             ui.end_row();
             ui.label("digits:");
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let mut digit = format!("{}", self.secret.digits());
+                let digit = format!("{}", self.secret.digits());
 
                 let img = egui::include_image!("../assets/copy.svg");
                 let button = egui::ImageButton::new(egui::Image::new(img));

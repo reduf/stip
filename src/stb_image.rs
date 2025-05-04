@@ -17,8 +17,8 @@ extern "C" {
 pub enum Channel {
     Default = 0,
     Grey = 1,
-    GreyAlpha = 2,
-    Rgb = 3,
+    _GreyAlpha = 2,
+    _Rgb = 3,
     Rgba = 4,
 }
 

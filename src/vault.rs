@@ -28,6 +28,37 @@ pub struct VaultSecret {
 }
 
 impl VaultSecret {
+    fn from_helper<F>(width: usize, height: usize, fill: F) -> Result<Self, Error>
+    where
+        F: FnMut(usize, usize) -> u8
+    {
+        let mut img = rqrr::PreparedImage::prepare_from_greyscale(width, height, fill);
+
+        if let Some(grid) = img.detect_grids().first() {
+            let content = grid
+                .decode()
+                .map_err(|err| {
+                    eprintln!("Failed to decode the QR code, error: {}", err);
+                    return Error;
+                })?
+                .1;
+
+            let parsed_url = otpauth::ParsedUrl::parse(content).map_err(|err| {
+                eprintln!("Failed to parse URL found in QR code, error: {:?}", err);
+                return Error;
+            })?;
+
+            return Ok(VaultSecret {
+                name: format!("{}: {}", parsed_url.issuer, parsed_url.account_name),
+                parsed_url: parsed_url,
+                icon: None,
+            });
+        } else {
+            eprintln!("Failed to detect the QR code");
+            return Err(Error);
+        }
+    }
+
     pub fn from_path(path: &Path) -> Result<Self, Error> {
         let content = std::fs::read(path).map_err(|err| {
             eprintln!("Failed to open {:?}, err: {}", path, err);
@@ -39,33 +70,16 @@ impl VaultSecret {
             return Error;
         })?;
 
-        let mut img = rqrr::PreparedImage::prepare_from_greyscale(img.width, img.height, |x, y| {
+        return Self::from_helper(img.width, img.height, |x, y| {
             return img.data()[(y * img.width) + x];
         });
+    }
 
-        if let Some(grid) = img.detect_grids().first() {
-            let content = grid
-                .decode()
-                .map_err(|err| {
-                    eprintln!("Failed to decode the QR code of {:?}, error: {}", path, err);
-                    return Error;
-                })?
-                .1;
-
-            let parsed_url = otpauth::ParsedUrl::parse(content).map_err(|err| {
-                eprintln!("Failed to parse URL found in QR code of {:?}, error: {:?}", path, err);
-                return Error;
-            })?;
-
-            return Ok(VaultSecret {
-                name: format!("{}: {}", parsed_url.issuer, parsed_url.account_name),
-                parsed_url: parsed_url,
-                icon: None,
-            });
-        } else {
-            eprintln!("Failed to detect the QR code of {:?}", path);
-            return Err(Error);
-        }
+    pub fn from_slice(width: usize, height: usize, data: &[u8]) -> Result<Self, Error> {
+        println!("hey width: {}, height: {}", width, height);
+        return Self::from_helper(width, height, |x, y| {
+            return data[(y * width) + x];
+        });
     }
 
     pub fn url(&self) -> &str {
